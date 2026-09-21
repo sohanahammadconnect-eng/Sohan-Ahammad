@@ -6,6 +6,7 @@ import { getItem, setItem, clearAll, extractYouTubeId } from '../utils/mediaStor
 interface PortfolioContextType {
   data: PortfolioDataState;
   isLoaded: boolean;
+  lastSavedTime: string | null;
   activeEditModal: 'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' | null;
   activeEditingItemId?: string;
   openEditModal: (section?: 'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio', itemId?: string) => void;
@@ -13,11 +14,15 @@ interface PortfolioContextType {
   updateProfilePic: (newImageSrc: string) => Promise<void>;
   updateFeaturedVideo: (video: Partial<VideoItem>) => Promise<void>;
   updatePortfolioVideo: (id: string, updates: Partial<VideoItem>) => Promise<void>;
+  addPortfolioVideo: (newVideo?: Partial<VideoItem>) => Promise<string>;
+  deletePortfolioVideo: (id: string) => Promise<void>;
+  reorderPortfolioVideo: (id: string, direction: 'prev' | 'next') => Promise<void>;
   updateGraphicItem: (id: string, updates: Partial<GraphicItem>) => Promise<void>;
   addGraphicItem: (newItem?: Partial<GraphicItem>) => Promise<string>;
   deleteGraphicItem: (id: string) => Promise<void>;
   reorderGraphicItem: (id: string, direction: 'prev' | 'next') => Promise<void>;
   updatePersonalInfo: (updates: Partial<PersonalInfo>) => Promise<void>;
+  saveAllNow: () => Promise<boolean>;
   resetToDefaults: () => Promise<void>;
   generateCustomHtml: () => string;
 }
@@ -25,7 +30,7 @@ interface PortfolioContextType {
 const STORAGE_KEY = 'sohan_portfolio_data_v1';
 
 const defaultState: PortfolioDataState = {
-  profilePic: 'profile.jpg',
+  profilePic: '',
   personalInfo: PERSONAL_INFO,
   featuredVideo: FEATURED_VIDEO,
   portfolioVideos: PORTFOLIO_VIDEOS,
@@ -37,23 +42,65 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(undefin
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<PortfolioDataState>(defaultState);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [activeEditModal, setActiveEditModal] = useState<'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' | null>(null);
   const [activeEditingItemId, setActiveEditingItemId] = useState<string | undefined>(undefined);
 
-  // Load from IndexedDB on startup
+  // Load from IndexedDB or Server API on startup
   useEffect(() => {
     async function loadData() {
       try {
-        const saved = await getItem<PortfolioDataState>(STORAGE_KEY);
+        let saved = await getItem<PortfolioDataState>(STORAGE_KEY);
+        
+        // Fallback to localStorage backup if IndexedDB is empty
+        if (!saved) {
+          try {
+            const ls = localStorage.getItem('sohan_portfolio_backup');
+            if (ls) saved = JSON.parse(ls);
+          } catch {
+            // ignore
+          }
+        }
+
+        // Fallback to server API if local is empty
+        if (!saved) {
+          try {
+            const res = await fetch('/api/get-portfolio');
+            if (res.ok) {
+              saved = await res.json();
+            }
+          } catch {
+            // ignore
+          }
+        }
+
         if (saved) {
+          const isOldGeneratedPic =
+            saved.profilePic &&
+            (saved.profilePic.includes('profile_photo') ||
+             saved.profilePic.includes('sohan_exact') ||
+             saved.profilePic.includes('profile.jpg'));
+
+          const cleanProfilePic = isOldGeneratedPic ? '' : (saved.profilePic || '');
+
+          let mergedVideos = saved.portfolioVideos && saved.portfolioVideos.length ? saved.portfolioVideos : defaultState.portfolioVideos;
+          // Ensure new slots (up to 10) are included for users with existing cached state
+          if (mergedVideos.length < defaultState.portfolioVideos.length) {
+            const existingIds = new Set(mergedVideos.map((v) => v.id));
+            const newSlots = defaultState.portfolioVideos.filter((v) => !existingIds.has(v.id));
+            mergedVideos = [...mergedVideos, ...newSlots];
+          }
+
           setData({
             ...defaultState,
             ...saved,
+            profilePic: cleanProfilePic,
             personalInfo: { ...defaultState.personalInfo, ...(saved.personalInfo || {}) },
             featuredVideo: { ...defaultState.featuredVideo, ...(saved.featuredVideo || {}) },
-            portfolioVideos: saved.portfolioVideos && saved.portfolioVideos.length ? saved.portfolioVideos : defaultState.portfolioVideos,
+            portfolioVideos: mergedVideos,
             graphicItems: saved.graphicItems && saved.graphicItems.length ? saved.graphicItems : defaultState.graphicItems,
           });
+          setLastSavedTime('Loaded from saved profile');
         }
       } catch (err) {
         console.error('Failed to load saved portfolio data', err);
@@ -66,11 +113,38 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const persist = async (nextState: PortfolioDataState) => {
     setData(nextState);
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLastSavedTime(now);
+
+    // 1. Save to IndexedDB (for large images and videos)
     try {
       await setItem(STORAGE_KEY, nextState);
     } catch (e) {
-      console.error('Failed to save to storage', e);
+      console.error('Failed to save to IndexedDB', e);
     }
+
+    // 2. Save backup to localStorage
+    try {
+      localStorage.setItem('sohan_portfolio_backup', JSON.stringify(nextState));
+    } catch (e) {
+      // ignore quota limits if image is large
+    }
+
+    // 3. Save to Server File via API
+    try {
+      await fetch('/api/save-portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextState),
+      });
+    } catch {
+      // silent offline fallback
+    }
+  };
+
+  const saveAllNow = async (): Promise<boolean> => {
+    await persist(data);
+    return true;
   };
 
   const openEditModal = (section: 'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' = 'all', itemId?: string) => {
@@ -109,6 +183,46 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       v.id === id ? { ...v, ...cleaned } : v
     );
     const next = { ...data, portfolioVideos: nextVideos };
+    await persist(next);
+  };
+
+  const addPortfolioVideo = async (newVideo?: Partial<VideoItem>): Promise<string> => {
+    const newId = 'video-' + Date.now();
+    const item: VideoItem = {
+      id: newId,
+      youtubeId: newVideo?.youtubeId ? extractYouTubeId(newVideo.youtubeId) : (newVideo?.videoSourceType === 'local' ? '' : 'hsPSXISkhbo'),
+      videoSourceType: newVideo?.videoSourceType || 'youtube',
+      videoUrl: newVideo?.videoUrl || '',
+      blobKey: newVideo?.blobKey || '',
+      thumbnailUrl: newVideo?.thumbnailUrl || '',
+      title: newVideo?.title || `New Video Slide ${data.portfolioVideos.length + 1}`,
+      category: newVideo?.category || 'Creative Video Edit',
+      description: newVideo?.description || 'Custom video editing cut showcasing narrative pacing and sound design.',
+    };
+    const next = { ...data, portfolioVideos: [...data.portfolioVideos, item] };
+    await persist(next);
+    return newId;
+  };
+
+  const deletePortfolioVideo = async (id: string) => {
+    if (data.portfolioVideos.length <= 1) {
+      alert('কমপক্ষে একটি ভিডিও স্লাইড থাকতে হবে।');
+      return;
+    }
+    const next = { ...data, portfolioVideos: data.portfolioVideos.filter((v) => v.id !== id) };
+    await persist(next);
+  };
+
+  const reorderPortfolioVideo = async (id: string, direction: 'prev' | 'next') => {
+    const index = data.portfolioVideos.findIndex((v) => v.id === id);
+    if (index === -1) return;
+    const targetIndex = direction === 'prev' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= data.portfolioVideos.length) return;
+
+    const nextItems = [...data.portfolioVideos];
+    const [moved] = nextItems.splice(index, 1);
+    nextItems.splice(targetIndex, 0, moved);
+    const next = { ...data, portfolioVideos: nextItems };
     await persist(next);
   };
 
@@ -540,11 +654,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updateProfilePic,
         updateFeaturedVideo,
         updatePortfolioVideo,
+        addPortfolioVideo,
+        deletePortfolioVideo,
+        reorderPortfolioVideo,
         updateGraphicItem,
         addGraphicItem,
         deleteGraphicItem,
         reorderGraphicItem,
         updatePersonalInfo,
+        saveAllNow,
+        lastSavedTime,
         resetToDefaults,
         generateCustomHtml,
       }}

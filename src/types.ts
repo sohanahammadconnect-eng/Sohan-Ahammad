@@ -1,6 +1,10 @@
 export interface VideoItem {
   id: string;
   youtubeId: string;
+  videoUrl?: string;
+  blobKey?: string;
+  videoSourceType?: 'youtube' | 'local';
+  thumbnailUrl?: string;
   title: string;
   category: string;
   duration?: string;

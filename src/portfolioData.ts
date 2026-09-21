@@ -66,6 +66,48 @@ export const PORTFOLIO_VIDEOS: VideoItem[] = [
     title: 'Creative Visual Experience',
     category: 'Creative Short',
     description: 'Experimental composition blending graphic elements, sound effects, and color grading.'
+  },
+  {
+    id: 'video-5',
+    youtubeId: 'hsPSXISkhbo',
+    title: 'Cinematic Travel & Atmosphere Reel',
+    category: 'Travel / Cinematic',
+    description: 'Color-graded travel showcase highlighting natural light and atmospheric soundscapes.'
+  },
+  {
+    id: 'video-6',
+    youtubeId: 'kJQP7kiw5Fk',
+    title: 'Modern Social Media & Short-Form Reel',
+    category: 'Reels / Shorts / TikTok',
+    description: 'Fast-paced, hook-optimized short form content tailored for maximum audience retention.'
+  },
+  {
+    id: 'video-7',
+    youtubeId: 'ScMzIvxBSi4',
+    title: 'Commercial Product & Brand Promo',
+    category: 'Commercial Promo',
+    description: 'High-production commercial cut focusing on typography, sleek transitions, and product focus.'
+  },
+  {
+    id: 'video-8',
+    youtubeId: '9bZkp7q19f0',
+    title: 'Event Highlights & Aftermovie Cut',
+    category: 'Event Highlight',
+    description: 'Capturing electric atmosphere and emotional moments with synchronized musical crescendos.'
+  },
+  {
+    id: 'video-9',
+    youtubeId: 'fJ9rUzIMcZQ',
+    title: 'Motion Graphics & VFX Visuals',
+    category: 'Motion & VFX',
+    description: 'Seamless integration of title animation, graphic overlays, and cinematic VFX polish.'
+  },
+  {
+    id: 'video-10',
+    youtubeId: 'L_LUpnjgPso',
+    title: 'Mini-Documentary & Interview Spotlight',
+    category: 'Interview / Docu',
+    description: 'Clean dialogue leveling, multi-camera angle cutting, and narrative B-roll weaving.'
   }
 ];
 

@@ -18,10 +18,14 @@ import {
   MoveLeft,
   MoveRight,
   Layers,
-  Link2
+  Link2,
+  Camera,
+  Image,
+  Save
 } from 'lucide-react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { extractYouTubeId } from '../utils/mediaStorage';
+import { VideoItemEditor } from './VideoItemEditor';
 
 export const MediaCustomizerModal: React.FC = () => {
   const {
@@ -32,17 +36,23 @@ export const MediaCustomizerModal: React.FC = () => {
     updateProfilePic,
     updateFeaturedVideo,
     updatePortfolioVideo,
+    addPortfolioVideo,
+    deletePortfolioVideo,
+    reorderPortfolioVideo,
     updateGraphicItem,
     addGraphicItem,
     deleteGraphicItem,
     reorderGraphicItem,
     updatePersonalInfo,
+    saveAllNow,
+    lastSavedTime,
     resetToDefaults,
     generateCustomHtml,
   } = usePortfolio();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'featured' | 'videos' | 'graphics'>('profile');
   const [saveToast, setSaveToast] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Sync tab with whichever trigger was clicked
   useEffect(() => {
@@ -59,7 +69,28 @@ export const MediaCustomizerModal: React.FC = () => {
 
   const showToast = () => {
     setSaveToast(true);
-    setTimeout(() => setSaveToast(false), 2000);
+    setTimeout(() => setSaveToast(false), 2500);
+  };
+
+  const handleManualSave = async () => {
+    setIsSaving(true);
+    try {
+      await saveAllNow();
+      showToast();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleExportJsonBackup = () => {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sohan_portfolio_data_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleProfileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -210,20 +241,36 @@ export const MediaCustomizerModal: React.FC = () => {
           {activeTab === 'profile' && (
             <div className="space-y-6">
               <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center gap-6">
-                <div className="relative group">
-                  <div className="w-28 h-28 rounded-2xl overflow-hidden ring-4 ring-amber-500/20 bg-slate-800 shadow-xl">
-                    <img
-                      src={data.profilePic}
-                      alt="Current profile"
-                      className="w-full h-full object-cover"
-                    />
+                <div className="relative shrink-0 group">
+                  <div className="w-28 h-28 rounded-2xl overflow-hidden ring-4 ring-amber-500/25 bg-slate-900 shadow-xl relative flex items-center justify-center">
+                    {data.profilePic ? (
+                      <img
+                        src={data.profilePic}
+                        alt="Current profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 text-slate-400">
+                        <User className="w-10 h-10 text-amber-500/80 mb-1" />
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">No Photo</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => profileFileInputRef.current?.click()}
+                      className="absolute inset-0 bg-slate-950/75 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex flex-col items-center justify-center text-xs font-semibold text-white gap-1 cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-amber-400" />
+                      <span>{data.profilePic ? 'ছবি পরিবর্তন' : 'ছবি আপলোড'}</span>
+                    </button>
                   </div>
                   <button
+                    type="button"
                     onClick={() => profileFileInputRef.current?.click()}
-                    className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex flex-col items-center justify-center text-xs font-semibold text-white gap-1"
+                    className="absolute -bottom-2 -right-2 bg-amber-500 hover:bg-amber-400 text-slate-950 p-1.5 rounded-full shadow-md flex items-center justify-center cursor-pointer transition-transform hover:scale-110"
+                    title="ছবি আপলোড / পরিবর্তন করুন"
                   >
-                    <Upload className="w-4 h-4 text-amber-400" />
-                    <span>Upload New</span>
+                    <Camera className="w-3.5 h-3.5" />
                   </button>
                   <input
                     type="file"
@@ -234,30 +281,42 @@ export const MediaCustomizerModal: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex-1 text-center sm:text-left space-y-2">
-                  <h4 className="font-display font-bold text-base text-white">
-                    Profile Photo
-                  </h4>
-                  <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-                    আপনার কম্পিউটার বা ফোন থেকে যেকোনো ছবি সিলেক্ট করুন। সাইজ অটোমেটিক অ্যাডজাস্ট হবে।
-                  </p>
-                  <div className="flex flex-wrap gap-2 pt-1 justify-center sm:justify-start">
+                <div className="flex-1 text-center sm:text-left space-y-3">
+                  <div>
+                    <h4 className="font-display font-bold text-base text-white">
+                      Profile Picture (প্রোফাইল ছবি)
+                    </h4>
+                    <p className="text-xs text-slate-400 leading-relaxed max-w-md mt-0.5">
+                      {data.profilePic
+                        ? 'আপনার নিজস্ব ছবি সফলভাবে আপলোড করা আছে। চাইলে নতুন ছবি দিয়ে পরিবর্তন বা রিমুভ করতে পারেন।'
+                        : 'বর্তমানে কোনো ডেমো বা এআই ছবি নেই। আপনার আসল ছবি আপলোড করতে নিচের বাটনে ক্লিক করুন।'}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
                     <button
+                      type="button"
                       onClick={() => profileFileInputRef.current?.click()}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors flex items-center gap-1.5 shadow"
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors flex items-center gap-1.5 shadow cursor-pointer"
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      <span>Choose Image from Device</span>
+                      <span>{data.profilePic ? 'Upload New Photo' : 'Upload from Device'}</span>
                     </button>
-                    <button
-                      onClick={() => {
-                        updateProfilePic('profile.jpg');
-                        showToast();
-                      }}
-                      className="px-3 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                    >
-                      Reset Photo
-                    </button>
+
+                    {data.profilePic && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateProfilePic('');
+                          showToast();
+                        }}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+                        title="প্রোফাইল ছবি মুছে ফেলুন"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove Photo (ছবি মুছুন)</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -418,80 +477,70 @@ export const MediaCustomizerModal: React.FC = () => {
                   className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white leading-relaxed focus:outline-none focus:border-amber-500"
                 />
               </div>
+
+              {/* Explicit Save & Backup Action Card */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+                <div className="space-y-1 text-center sm:text-left">
+                  <div className="flex items-center justify-center sm:justify-start gap-2 text-amber-400 font-bold text-sm">
+                    <Save className="w-4 h-4 text-amber-500" />
+                    <span>Save Profile & Bio (তথ্য সেভ করুন)</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-normal">
+                    আপনার নাম, রোল, বায়ো ও কন্টাক্ট তথ্য ব্রাউজার এবং সার্ভারে স্থায়ীভাবে সংরক্ষিত হবে।
+                  </p>
+                  {lastSavedTime && (
+                    <div className="text-[11px] text-emerald-400 font-semibold flex items-center justify-center sm:justify-start gap-1">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>সর্বশেষ সেভ: {lastSavedTime}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={handleManualSave}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isSaving ? 'সংরক্ষণ হচ্ছে...' : 'Save Profile & Bio'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportJsonBackup}
+                    className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    title="সম্পূর্ণ প্রোফাইল ডাটা ব্যাকআপ ডাউনলোড করুন"
+                  >
+                    <Download className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Backup JSON</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
           {/* TAB 2: FEATURED VIDEO */}
           {activeTab === 'featured' && (
             <div className="space-y-6">
-              <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800 space-y-4">
-                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-                  <Youtube className="w-5 h-5 text-red-500" />
-                  <span>Main Featured Trailer Video</span>
-                </div>
+              <div>
+                <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                  <span>Main Featured Video / Showreel</span>
+                </h4>
                 <p className="text-xs text-slate-400">
-                  You can paste any YouTube URL (e.g. <code>https://www.youtube.com/watch?v=hsPSXISkhbo</code> or <code>https://youtu.be/hsPSXISkhbo</code>) or just the 11-character Video ID.
+                  ওয়েবসাইটের শীর্ষে থাকা প্রধান শো-রিল বা সেরা ভিডিও। আপনি সরাসরি কম্পিউটার/মোবাইল থেকে ভিডিও ফাইল আপলোড করতে পারেন অথবা ইউটিউব লিংক ব্যবহার করতে পারেন।
                 </p>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                      YouTube URL or Video ID
-                    </label>
-                    <input
-                      type="text"
-                      value={data.featuredVideo.youtubeId}
-                      onChange={(e) => {
-                        const id = extractYouTubeId(e.target.value);
-                        updateFeaturedVideo({ youtubeId: id });
-                      }}
-                      placeholder="Paste YouTube link or ID..."
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                        Title
-                      </label>
-                      <input
-                        type="text"
-                        value={data.featuredVideo.title}
-                        onChange={(e) => updateFeaturedVideo({ title: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                        Category Tag
-                      </label>
-                      <input
-                        type="text"
-                        value={data.featuredVideo.category}
-                        onChange={(e) => updateFeaturedVideo({ category: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Live Preview */}
-                <div className="mt-4 pt-4 border-t border-slate-800">
-                  <span className="text-xs font-semibold text-slate-400 mb-2 block">
-                    Live Video Preview:
-                  </span>
-                  <div className="aspect-video w-full max-w-lg mx-auto rounded-xl overflow-hidden bg-black border border-slate-800 shadow-md">
-                    <iframe
-                      src={`https://www.youtube-nocookie.com/embed/${data.featuredVideo.youtubeId}?rel=0`}
-                      title="Preview"
-                      className="w-full h-full border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                </div>
               </div>
+
+              <VideoItemEditor
+                video={data.featuredVideo}
+                label="Featured Trailer / Best Video"
+                onUpdate={(updates) => {
+                  updateFeaturedVideo(updates);
+                  showToast();
+                }}
+                showCategoryAndDesc={true}
+              />
             </div>
           )}
 
@@ -526,120 +575,73 @@ export const MediaCustomizerModal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h4 className="font-display font-bold text-base text-white">
-                    Manage 4 Portfolio Videos
+                  <h4 className="font-display font-bold text-base text-white flex items-center gap-2">
+                    <span>Manage Video Slides</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
+                      {data.portfolioVideos.length} Slides
+                    </span>
                   </h4>
                   <p className="text-xs text-slate-400">
-                    এখানে আপনার যেকোনো ৪টি ভিডিওর ইউটিউব লিংক বসান
+                    এখানে আপনার যেকোনো ভিডিও স্লাইডের ইউটিউব লিংক, টাইটেল ও ক্যাটাগরি সেট করুন
                   </p>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await addPortfolioVideo();
+                    showToast();
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Video Slide</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {data.portfolioVideos.map((video, idx) => (
-                  <div
+                  <VideoItemEditor
                     key={video.id}
-                    className={`p-4 rounded-2xl border bg-slate-950/60 space-y-3 ${
-                      activeEditingItemId === video.id
-                        ? 'border-amber-500 ring-2 ring-amber-500/20'
-                        : 'border-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        Slot {idx + 1}
-                      </span>
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        ID: {video.youtubeId}
-                      </span>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                        YouTube URL or ID
-                      </label>
-                      <input
-                        type="text"
-                        value={video.youtubeId}
-                        onChange={(e) => {
-                          const id = extractYouTubeId(e.target.value);
-                          updatePortfolioVideo(video.id, { youtubeId: id });
-                        }}
-                        placeholder="Paste link or ID..."
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                        Video Title
-                      </label>
-                      <input
-                        type="text"
-                        value={video.title}
-                        onChange={(e) =>
-                          updatePortfolioVideo(video.id, { title: e.target.value })
-                        }
-                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                          Category
-                        </label>
-                        <input
-                          type="text"
-                          value={video.category}
-                          onChange={(e) =>
-                            updatePortfolioVideo(video.id, { category: e.target.value })
+                    video={video}
+                    label={`Slide #${idx + 1}`}
+                    isActive={activeEditingItemId === video.id}
+                    canReorder={true}
+                    isFirst={idx === 0}
+                    isLast={idx === data.portfolioVideos.length - 1}
+                    onReorder={(direction) => reorderPortfolioVideo(video.id, direction)}
+                    onDelete={
+                      data.portfolioVideos.length > 1
+                        ? () => {
+                            if (window.confirm(`আপনি কি "${video.title}" ভিডিও স্লাইডটি মুছে ফেলতে চান?`)) {
+                              deletePortfolioVideo(video.id);
+                            }
                           }
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                          Description
-                        </label>
-                        <input
-                          type="text"
-                          value={video.description || ''}
-                          onChange={(e) =>
-                            updatePortfolioVideo(video.id, { description: e.target.value })
-                          }
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Thumbnail preview */}
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center gap-3">
-                      <div className="w-20 h-12 rounded-lg overflow-hidden bg-black shrink-0 relative">
-                        <img
-                          src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
-                          alt="Thumb"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                      <a
-                        href={`https://www.youtube.com/watch?v=${video.youtubeId}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-amber-400 hover:underline flex items-center gap-1"
-                      >
-                        <span>Check on YouTube</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  </div>
+                        : undefined
+                    }
+                    onUpdate={(updates) => {
+                      updatePortfolioVideo(video.id, updates);
+                      showToast();
+                    }}
+                    showCategoryAndDesc={true}
+                  />
                 ))}
               </div>
+
+              {/* Bottom Add Slide Button */}
+              <button
+                type="button"
+                onClick={async () => {
+                  await addPortfolioVideo();
+                  showToast();
+                }}
+                className="w-full py-4 rounded-2xl border-2 border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-900/30 text-slate-400 hover:text-amber-400 flex items-center justify-center gap-2 font-bold text-xs transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add Another Video Slide (আরেকটি নতুন ভিডিও স্লাইড যোগ করুন)</span>
+              </button>
             </div>
           )}
 
@@ -895,26 +897,44 @@ export const MediaCustomizerModal: React.FC = () => {
               <span>Reset to Defaults</span>
             </button>
             {saveToast && (
-              <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 animate-fade-in">
+              <span className="text-xs text-emerald-400 font-bold flex items-center gap-1.5 animate-fade-in bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
                 <Check className="w-3.5 h-3.5" />
-                <span>Saved to your browser!</span>
+                <span>সব তথ্য সফলভাবে সেভ করা হয়েছে!</span>
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleDownloadUpdatedHtml}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors flex items-center gap-1.5"
+              type="button"
+              onClick={handleExportJsonBackup}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Backup complete data"
             >
-              <FileCode className="w-3.5 h-3.5 text-amber-400" />
-              <span>Export index.html</span>
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span>Backup JSON</span>
             </button>
+
             <button
-              onClick={closeEditModal}
-              className="px-5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow transition-all"
+              type="button"
+              onClick={handleManualSave}
+              disabled={isSaving}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              Done & Close
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSaving ? 'সংরক্ষণ হচ্ছে...' : 'Save Now'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await handleManualSave();
+                closeEditModal();
+              }}
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Save & Close</span>
             </button>
           </div>
         </div>

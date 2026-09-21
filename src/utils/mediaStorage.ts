@@ -1,6 +1,8 @@
+import { VideoItem } from '../types';
+
 /**
  * Reliable client-side storage using IndexedDB with localStorage fallback
- * Allows storing high-resolution images (data URLs / Blobs) without 5MB quota limits.
+ * Allows storing high-resolution images & videos (data URLs / Blobs) without 5MB quota limits.
  */
 
 const DB_NAME = 'sohan_portfolio_db';
@@ -127,4 +129,73 @@ export function extractYouTubeId(input: string): string {
   if (embedMatch) return embedMatch[1];
 
   return trimmed;
+}
+
+const blobUrlCache = new Map<string, string>();
+
+/**
+ * Uploads a user-selected video file:
+ * 1. Stores binary blob in IndexedDB for immediate local offline playback.
+ * 2. Streams to server /api/upload-video to persist as a static server asset (/uploads/...).
+ */
+export async function uploadVideoFile(file: File): Promise<{ url: string; blobKey: string }> {
+  const blobKey = `video_blob_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  // Store blob in IndexedDB
+  await setItem(blobKey, file);
+
+  // Attempt server upload
+  try {
+    const res = await fetch('/api/upload-video', {
+      method: 'POST',
+      headers: {
+        'x-filename': encodeURIComponent(file.name),
+        'Content-Type': file.type || 'video/mp4',
+      },
+      body: file,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) {
+        return { url: data.url, blobKey };
+      }
+    }
+  } catch (err) {
+    console.warn('Server upload not available, using client blob storage', err);
+  }
+
+  // Fallback to local Object URL
+  const localUrl = URL.createObjectURL(file);
+  blobUrlCache.set(blobKey, localUrl);
+  return { url: localUrl, blobKey };
+}
+
+/**
+ * Resolves the playable URL for a video item:
+ * - If server asset or remote URL, returns as-is.
+ * - If blobKey exists, fetches the Blob from IndexedDB and creates an Object URL.
+ */
+export async function resolveVideoUrl(video: Partial<VideoItem>): Promise<string> {
+  if (video.videoSourceType === 'youtube' && !video.videoUrl) {
+    return '';
+  }
+
+  // If server path or http URL
+  if (video.videoUrl && (video.videoUrl.startsWith('/uploads/') || video.videoUrl.startsWith('http'))) {
+    return video.videoUrl;
+  }
+
+  // If blobKey exists in IndexedDB
+  if (video.blobKey) {
+    if (blobUrlCache.has(video.blobKey)) {
+      return blobUrlCache.get(video.blobKey)!;
+    }
+    const blob = await getItem<Blob>(video.blobKey);
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      blobUrlCache.set(video.blobKey, url);
+      return url;
+    }
+  }
+
+  return video.videoUrl || '';
 }
