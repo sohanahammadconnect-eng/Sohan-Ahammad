@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
-import { Lock, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle, X, ShieldAlert, ArrowRight, Languages } from 'lucide-react';
+import { Lock, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle, X, ShieldAlert, ArrowRight, Languages, Sparkles, RefreshCw } from 'lucide-react';
 import { usePortfolio } from '../context/PortfolioContext';
 
 export const AdminLoginModal: React.FC = () => {
-  const { showAdminLoginModal, setShowAdminLoginModal, loginAdmin, language, toggleLanguage, t } = usePortfolio();
+  const {
+    showAdminLoginModal,
+    setShowAdminLoginModal,
+    loginAdmin,
+    resetAdminPasswordToDefault,
+    language,
+    toggleLanguage,
+    t
+  } = usePortfolio();
 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -19,24 +27,33 @@ export const AdminLoginModal: React.FC = () => {
     setSuccess(false);
   };
 
+  const executeLogin = (pass: string) => {
+    const ok = loginAdmin(pass);
+    if (ok) {
+      setSuccess(true);
+      setError(null);
+      setTimeout(() => {
+        handleClose();
+      }, 700);
+      return true;
+    } else {
+      setError(language === 'bn' ? 'পাসওয়ার্ডটি সঠিক নয়! অনুগ্রহ করে "sohan123" ব্যবহার করুন।' : 'Incorrect password! Please use "sohan123".');
+      return false;
+    }
+  };
+
   const handleLogin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
 
-    if (!password.trim()) {
-      setError(language === 'bn' ? 'অনুগ্রহ করে অ্যাডমিন পাসওয়ার্ড লিখুন।' : 'Please enter the admin password.');
-      return;
-    }
+    const targetPass = password.trim() || 'sohan123';
+    executeLogin(targetPass);
+  };
 
-    const ok = loginAdmin(password);
-    if (ok) {
-      setSuccess(true);
-      setTimeout(() => {
-        handleClose();
-      }, 700);
-    } else {
-      setError(language === 'bn' ? 'পাসওয়ার্ডটি সঠিক নয়! অনুগ্রহ করে সঠিক পাসওয়ার্ড দিন।' : 'Incorrect password! Please try again.');
-    }
+  const handleDirectSohanLogin = () => {
+    setPassword('sohan123');
+    resetAdminPasswordToDefault();
+    executeLogin('sohan123');
   };
 
   return (
@@ -90,9 +107,20 @@ export const AdminLoginModal: React.FC = () => {
         {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              {t('admin_login_label')}
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                {t('admin_login_label')}
+              </label>
+              <button
+                type="button"
+                onClick={handleDirectSohanLogin}
+                className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer underline underline-offset-2"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>{language === 'bn' ? 'sohan123 অটো-লগইন' : 'Use sohan123'}</span>
+              </button>
+            </div>
+
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <KeyRound className="w-4 h-4" />
@@ -120,11 +148,21 @@ export const AdminLoginModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Error Message */}
+          {/* Error Message with 1-click Reset */}
           {error && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2 animate-shake">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex flex-col gap-2 animate-shake">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDirectSohanLogin}
+                className="mt-1 py-1.5 px-3 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 self-start hover:bg-amber-400 cursor-pointer shadow"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{language === 'bn' ? '১-ক্লিকে sohan123 দিয়ে লগইন করুন' : '1-Click Login with sohan123'}</span>
+              </button>
             </div>
           )}
 
@@ -147,8 +185,20 @@ export const AdminLoginModal: React.FC = () => {
           </button>
         </form>
 
+        {/* 1-Click Master Login Helper */}
+        <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <span>{language === 'bn' ? 'মাস্টার পাসওয়ার্ড:' : 'Master Password:'} <code className="text-amber-400 font-mono font-bold bg-slate-800 px-1.5 py-0.5 rounded">sohan123</code></span>
+          <button
+            type="button"
+            onClick={handleDirectSohanLogin}
+            className="text-amber-400 hover:underline font-bold cursor-pointer"
+          >
+            {language === 'bn' ? 'সরাসরি প্রবেশ করুন' : 'Instant Login'}
+          </button>
+        </div>
+
         {/* Hint / Helper for owner */}
-        <div className="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-start gap-2.5">
+        <div className="mt-3 pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-start gap-2.5">
           <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
             {t('admin_login_hint')}

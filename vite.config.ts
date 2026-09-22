@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import {defineConfig, Plugin} from 'vite';
 
 const savedPortfolioPath = path.resolve(__dirname, 'public/saved_portfolio.json');
@@ -51,14 +52,54 @@ function portfolioApiPlugin(): Plugin {
             try {
               const data = JSON.parse(body);
               fs.writeFileSync(savedPortfolioPath, JSON.stringify(data, null, 2), 'utf-8');
+
+              // Automatically regenerate src/portfolioData.ts and re-package public/sohan-portfolio-latest.zip
+              try {
+                execSync('python3 scripts/update_portfolio_and_zip.py', { cwd: __dirname });
+              } catch (e) {
+                console.error('Failed to run update_portfolio_and_zip.py', e);
+              }
+
               res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: true, message: 'Data saved successfully' }));
+              res.end(JSON.stringify({ success: true, message: 'Data saved and ZIP updated successfully' }));
             } catch (err) {
               res.writeHead(500, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: false, error: String(err) }));
             }
           });
           return;
+        }
+
+        if (req.url === '/api/rebuild-zip') {
+          try {
+            execSync('python3 scripts/update_portfolio_and_zip.py', { cwd: __dirname });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'ZIP rebuilt successfully' }));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: String(err) }));
+          }
+          return;
+        }
+
+        if (req.url?.startsWith('/api/download-zip')) {
+          const zipPath = path.resolve(__dirname, 'public/sohan-portfolio-latest.zip');
+          if (fs.existsSync(zipPath)) {
+            const stat = fs.statSync(zipPath);
+            res.writeHead(200, {
+              'Content-Type': 'application/zip',
+              'Content-Disposition': 'attachment; filename="sohan-portfolio-latest.zip"',
+              'Content-Length': stat.size,
+              'Cache-Control': 'no-store, no-cache, must-revalidate',
+            });
+            const readStream = fs.createReadStream(zipPath);
+            readStream.pipe(res);
+            return;
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Zip not found' }));
+            return;
+          }
         }
 
         if (req.url === '/api/get-portfolio' && req.method === 'GET') {

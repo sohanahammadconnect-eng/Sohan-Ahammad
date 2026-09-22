@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, MessageCircle, MapPin, Clock, Sparkles, ExternalLink, Heart, Edit3, Lock } from 'lucide-react';
+import { Mail, MessageCircle, MapPin, Clock, Sparkles, ExternalLink, Heart, Edit3, Lock, Phone, Youtube, Globe } from 'lucide-react';
 import { ThemeMode } from '../types';
 import { usePortfolio } from '../context/PortfolioContext';
 
@@ -146,25 +146,39 @@ export const AboutAndContact: React.FC<AboutAndContactProps> = ({ theme }) => {
               {t('contact_subtitle')}
             </p>
 
-            {/* Direct Connect Buttons: WhatsApp & Gmail */}
-            <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
+            {/* Direct Connect Buttons: WhatsApp, Call, Gmail, Behance */}
+            <div className="flex flex-wrap items-center justify-center gap-3.5 mb-8">
               {/* WhatsApp direct chat */}
-              <a
-                id="btn-contact-whatsapp"
-                href={personalInfo.whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl font-bold text-sm bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-600/25 hover:shadow-emerald-600/40 transition-all hover:scale-105 active:scale-95"
-              >
-                <MessageCircle className="w-5 h-5 fill-current" />
-                <span>{t('contact_btn_whatsapp')}</span>
-              </a>
+              {personalInfo.whatsappUrl && (
+                <a
+                  id="btn-contact-whatsapp"
+                  href={personalInfo.whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-bold text-sm bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-600/25 hover:shadow-emerald-600/40 transition-all hover:scale-105 active:scale-95"
+                >
+                  <MessageCircle className="w-5 h-5 fill-current" />
+                  <span>{t('contact_btn_whatsapp')}</span>
+                </a>
+              )}
+
+              {/* WhatsApp / Phone Direct Call */}
+              {personalInfo.whatsappNumber && (
+                <a
+                  id="btn-contact-phone"
+                  href={`tel:${personalInfo.whatsappNumber.replace(/[^0-9+]/g, '')}`}
+                  className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-xl transition-all hover:scale-105 active:scale-95"
+                >
+                  <Phone className="w-5 h-5 text-emerald-400" />
+                  <span>{personalInfo.whatsappNumber}</span>
+                </a>
+              )}
 
               {/* Gmail mailto */}
               <a
                 id="btn-contact-email"
                 href={mailtoLink}
-                className={`inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl font-bold text-sm border transition-all hover:scale-105 active:scale-95 shadow-lg ${
+                className={`inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-bold text-sm border transition-all hover:scale-105 active:scale-95 shadow-lg ${
                   isDark
                     ? 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-white shadow-black/40'
                     : 'bg-white hover:bg-slate-100 border-slate-300 text-slate-900 shadow-slate-200'
@@ -173,6 +187,62 @@ export const AboutAndContact: React.FC<AboutAndContactProps> = ({ theme }) => {
                 <Mail className="w-5 h-5 text-amber-500" />
                 <span>{t('contact_btn_email')}</span>
               </a>
+
+              {/* Behance Link */}
+              {personalInfo.behanceUrl && (
+                <a
+                  id="btn-contact-behance"
+                  href={personalInfo.behanceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-bold text-sm bg-blue-600 hover:bg-blue-500 text-white shadow-xl shadow-blue-600/25 transition-all hover:scale-105 active:scale-95"
+                >
+                  <Globe className="w-5 h-5" />
+                  <span>Behance Portfolio</span>
+                </a>
+              )}
+
+              {/* YouTube Link */}
+              {personalInfo.youtubeChannelUrl && (
+                <a
+                  id="btn-contact-youtube"
+                  href={personalInfo.youtubeChannelUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/40 transition-all hover:scale-105 active:scale-95"
+                >
+                  <Youtube className="w-4 h-4" />
+                  <span>YouTube</span>
+                </a>
+              )}
+
+              {/* Instagram Link */}
+              {personalInfo.instagramUrl && (
+                <a
+                  id="btn-contact-instagram"
+                  href={personalInfo.instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs bg-pink-600/20 hover:bg-pink-600/30 text-pink-400 border border-pink-500/40 transition-all hover:scale-105 active:scale-95"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>Instagram</span>
+                </a>
+              )}
+
+              {/* LinkedIn Link */}
+              {personalInfo.linkedinUrl && (
+                <a
+                  id="btn-contact-linkedin"
+                  href={personalInfo.linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-xs bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 border border-sky-500/40 transition-all hover:scale-105 active:scale-95"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>LinkedIn</span>
+                </a>
+              )}
             </div>
 
             {/* Location & Response info badges */}
@@ -189,6 +259,13 @@ export const AboutAndContact: React.FC<AboutAndContactProps> = ({ theme }) => {
                 <span>Direct Email:</span>
                 <span className="font-mono text-amber-400">{personalInfo.email}</span>
               </div>
+              {personalInfo.whatsappNumber && (
+                <div className="flex items-center gap-1.5 text-slate-300">
+                  <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>WhatsApp:</span>
+                  <span className="font-mono text-emerald-400">{personalInfo.whatsappNumber}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

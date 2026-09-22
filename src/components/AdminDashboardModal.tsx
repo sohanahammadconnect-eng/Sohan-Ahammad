@@ -29,6 +29,7 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  Edit3,
 } from 'lucide-react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { extractYouTubeId } from '../utils/mediaStorage';
@@ -56,6 +57,7 @@ export const AdminDashboardModal: React.FC = () => {
     updateFeaturedVideo,
     saveAllNow,
     lastSavedTime,
+    importBackupData,
     language,
     setLanguage,
     toggleLanguage,
@@ -100,7 +102,120 @@ export const AdminDashboardModal: React.FC = () => {
   // Copy code toast
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Import JSON Backup state
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Manual Save All state
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedToast, setSavedToast] = useState(false);
+
+  // Inline video edit state
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [editVideoTitle, setEditVideoTitle] = useState('');
+  const [editVideoUrl, setEditVideoUrl] = useState('');
+  const [editVideoCategory, setEditVideoCategory] = useState('');
+  const [editVideoDesc, setEditVideoDesc] = useState('');
+
+  // Inline graphic edit state
+  const [editingGraphicId, setEditingGraphicId] = useState<string | null>(null);
+  const [editGraphicTitle, setEditGraphicTitle] = useState('');
+  const [editGraphicSubtitle, setEditGraphicSubtitle] = useState('');
+  const [editGraphicCategory, setEditGraphicCategory] = useState('');
+  const [editGraphicFit, setEditGraphicFit] = useState<'cover' | 'contain'>('cover');
+  const [isBuildingZip, setIsBuildingZip] = useState(false);
+  const [zipDownloadSuccess, setZipDownloadSuccess] = useState(false);
+
   if (!showAdminDashboard) return null;
+
+  // Save All Changes Immediately
+  const handleManualSaveAll = async () => {
+    setIsSaving(true);
+    await saveAllNow();
+    setIsSaving(false);
+    setSavedToast(true);
+    setTimeout(() => setSavedToast(false), 3500);
+  };
+
+  // Sync Everything & Download Fresh ZIP
+  const handleDownloadFreshZip = async () => {
+    setIsBuildingZip(true);
+    setZipDownloadSuccess(false);
+    try {
+      // 1. Post entire live state to server to save files and regenerate ZIP
+      await fetch('/api/save-portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      // 2. Fetch binary ZIP blob to ensure 100% clean archive download
+      const res = await fetch(`/api/download-zip?t=${Date.now()}`);
+      if (!res.ok) throw new Error('Failed to download ZIP file');
+      const blob = await res.blob();
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = 'sohan-portfolio-latest.zip';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 15000);
+
+      setZipDownloadSuccess(true);
+      setTimeout(() => setZipDownloadSuccess(false), 8000);
+    } catch (err) {
+      console.error('Error generating fresh ZIP', err);
+      // Fallback direct link
+      window.location.href = `/api/download-zip?t=${Date.now()}`;
+    } finally {
+      setIsBuildingZip(false);
+    }
+  };
+
+  // Video Inline Edit Handlers
+  const handleStartEditVideo = (v: VideoItem) => {
+    setEditingVideoId(v.id);
+    setEditVideoTitle(v.title);
+    setEditVideoUrl(`https://www.youtube.com/watch?v=${v.youtubeId}`);
+    setEditVideoCategory(v.category);
+    setEditVideoDesc(v.description || '');
+  };
+
+  const handleSaveEditVideo = async (id: string) => {
+    const trimmedUrl = editVideoUrl.trim();
+    const ytId = extractYouTubeId(trimmedUrl);
+    await updatePortfolioVideo(id, {
+      title: editVideoTitle.trim() || 'Untitled Video',
+      youtubeId: ytId || trimmedUrl,
+      category: editVideoCategory || 'Commercial',
+      description: editVideoDesc.trim(),
+    });
+    setEditingVideoId(null);
+  };
+
+  // Graphic Inline Edit Handlers
+  const handleStartEditGraphic = (g: GraphicItem) => {
+    setEditingGraphicId(g.id);
+    setEditGraphicTitle(g.title);
+    setEditGraphicSubtitle(g.subtitle || '');
+    setEditGraphicCategory(g.category);
+    setEditGraphicFit(g.fitMode || 'cover');
+  };
+
+  const handleSaveEditGraphic = async (id: string) => {
+    await updateGraphicItem(id, {
+      title: editGraphicTitle.trim() || 'Untitled Design',
+      subtitle: editGraphicSubtitle.trim(),
+      category: editGraphicCategory || 'Film Poster',
+      fitMode: editGraphicFit,
+    });
+    setEditingGraphicId(null);
+  };
 
   // Handle New Video Submit
   const handleAddVideo = async (e: React.FormEvent) => {
@@ -246,6 +361,31 @@ export const AdminDashboardModal: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Import JSON Backup
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        const success = await importBackupData(parsed);
+        if (success) {
+          setImportStatus('success:ডাটা সফলভাবে রিস্টোর হয়েছে!');
+          setTimeout(() => setImportStatus(null), 4000);
+        } else {
+          setImportStatus('error:ব্যাকআপ ফাইলটি সঠিক নয়।');
+          setTimeout(() => setImportStatus(null), 4000);
+        }
+      } catch {
+        setImportStatus('error:JSON ফাইল পড়া সম্ভব হয়নি।');
+        setTimeout(() => setImportStatus(null), 4000);
+      }
+    };
+    reader.readAsText(file);
+    if (e.target) e.target.value = '';
+  };
+
   return (
     <div
       id="admin-dashboard-modal-backdrop"
@@ -279,6 +419,36 @@ export const AdminDashboardModal: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Manual Save All Button */}
+            <button
+              type="button"
+              onClick={handleManualSaveAll}
+              disabled={isSaving}
+              className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md ${
+                savedToast
+                  ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/30'
+                  : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20 active:scale-95'
+              }`}
+              title="সবকিছু সেভ করুন এবং লাইভ ওয়েবসাইটে তাৎক্ষণিক আপডেট করুন"
+            >
+              {savedToast ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>লাইভ আপডেট হয়েছে!</span>
+                </>
+              ) : isSaving ? (
+                <>
+                  <Save className="w-3.5 h-3.5 animate-spin" />
+                  <span>সেভ হচ্ছে...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>সেভ করুন</span>
+                </>
+              )}
+            </button>
+
             {/* Quick Language Toggle */}
             <button
               type="button"
@@ -309,6 +479,21 @@ export const AdminDashboardModal: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
           </div>
+        </div>
+
+        {/* Global info reminder banner */}
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-between text-[11px] text-amber-300">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>
+              {language === 'bn'
+                ? 'পাবলিশ করার পর আর এখানে আসতে হবে না—অনলাইনে সরাসরি আপনার সাইটেই লগইন করে সব ভিডিও, গ্রাফিক্স ও কন্টাক্ট লিংক পরিবর্তন ও যোগ করতে পারবেন।'
+                : 'Manage everything live on your website after publishing—no need to return to the editor.'}
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+            Status: {lastSavedTime ? `Synced (${lastSavedTime})` : 'Auto-Sync Ready'}
+          </span>
         </div>
 
         {/* Navigation Tabs */}
@@ -516,63 +701,139 @@ export const AdminDashboardModal: React.FC = () => {
                   {data.portfolioVideos.map((video, idx) => (
                     <div
                       key={video.id}
-                      className="p-3 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-slate-700 transition-all"
+                      className="p-3 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col gap-3 hover:border-slate-700 transition-all"
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-slate-800 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
-                          #{idx + 1}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-slate-800 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
+                            #{idx + 1}
+                          </div>
+                          <div className="w-16 h-10 rounded-lg bg-slate-900 overflow-hidden shrink-0 border border-slate-700 relative">
+                            <img
+                              src={video.thumbnailUrl || `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <h5 className="font-bold text-xs sm:text-sm text-white truncate">
+                              {video.title}
+                            </h5>
+                            <span className="text-[11px] text-amber-400 font-medium">
+                              {video.category} • YouTube ID: {video.youtubeId}
+                            </span>
+                          </div>
                         </div>
-                        <div className="w-16 h-10 rounded-lg bg-slate-900 overflow-hidden shrink-0 border border-slate-700 relative">
-                          <img
-                            src={video.thumbnailUrl || `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <h5 className="font-bold text-xs sm:text-sm text-white truncate">
-                            {video.title}
-                          </h5>
-                          <span className="text-[11px] text-amber-400 font-medium">
-                            {video.category} • YouTube ID: {video.youtubeId}
-                          </span>
+
+                        {/* Controls: Edit, Up, Down, Delete */}
+                        <div className="flex items-center gap-1.5 self-end sm:self-center">
+                          <button
+                            type="button"
+                            onClick={() => (editingVideoId === video.id ? setEditingVideoId(null) : handleStartEditVideo(video))}
+                            className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all ${
+                              editingVideoId === video.id
+                                ? 'bg-amber-500 text-slate-950 border-amber-500'
+                                : 'border-slate-800 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400'
+                            }`}
+                            title="ভিডিওর তথ্য পরিবর্তন বা এডিট করুন"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span className="text-[11px] hidden sm:inline">{editingVideoId === video.id ? 'বাতিল' : 'পরিবর্তন'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => reorderPortfolioVideo(video.id, 'prev')}
+                            disabled={idx === 0}
+                            className="p-2 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="উপরে নিন"
+                          >
+                            <MoveUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => reorderPortfolioVideo(video.id, 'next')}
+                            disabled={idx === data.portfolioVideos.length - 1}
+                            className="p-2 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="নিচে নিন"
+                          >
+                            <MoveDown className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`"${video.title}" ভিডিওটি মুছে ফেলতে চান?`)) {
+                                deletePortfolioVideo(video.id);
+                              }
+                            }}
+                            disabled={data.portfolioVideos.length <= 1}
+                            className="p-2 rounded-lg border border-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="ভিডিও মুছুন"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Controls: Up, Down, Delete */}
-                      <div className="flex items-center gap-1.5 self-end sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => reorderPortfolioVideo(video.id, 'prev')}
-                          disabled={idx === 0}
-                          className="p-2 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="উপরে নিন"
-                        >
-                          <MoveUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => reorderPortfolioVideo(video.id, 'next')}
-                          disabled={idx === data.portfolioVideos.length - 1}
-                          className="p-2 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="নিচে নিন"
-                        >
-                          <MoveDown className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`"${video.title}" ভিডিওটি মুছে ফেলতে চান?`)) {
-                              deletePortfolioVideo(video.id);
-                            }
-                          }}
-                          disabled={data.portfolioVideos.length <= 1}
-                          className="p-2 rounded-lg border border-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="ভিডিও মুছুন"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {/* Inline Video Editor Drawer */}
+                      {editingVideoId === video.id && (
+                        <div className="w-full mt-2 pt-3 border-t border-slate-800 bg-slate-900/60 p-3 rounded-xl space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">ভিডিও টাইটেল (Title)</label>
+                              <input
+                                type="text"
+                                value={editVideoTitle}
+                                onChange={(e) => setEditVideoTitle(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">YouTube লিংক বা ভিডিও আইডি</label>
+                              <input
+                                type="text"
+                                value={editVideoUrl}
+                                onChange={(e) => setEditVideoUrl(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs font-mono focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">ক্যাটাগরি (Category)</label>
+                              <input
+                                type="text"
+                                value={editVideoCategory}
+                                onChange={(e) => setEditVideoCategory(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">বিবরণ (Description)</label>
+                              <input
+                                type="text"
+                                value={editVideoDesc}
+                                onChange={(e) => setEditVideoDesc(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingVideoId(null)}
+                              className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                            >
+                              বাতিল
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEditVideo(video.id)}
+                              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
+                            >
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>পরিবর্তন সংরক্ষণ করুন</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -767,63 +1028,141 @@ export const AdminDashboardModal: React.FC = () => {
                   {data.graphicItems.map((item, idx) => (
                     <div
                       key={item.id}
-                      className="p-3 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-slate-700 transition-all"
+                      className="p-3 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col gap-3 hover:border-slate-700 transition-all"
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-slate-800 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
-                          #{idx + 1}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-slate-800 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
+                            #{idx + 1}
+                          </div>
+                          <div className="w-14 h-14 rounded-lg bg-slate-900 overflow-hidden shrink-0 border border-slate-700">
+                            <img
+                              src={item.filename.startsWith('data:') || item.filename.startsWith('http') ? item.filename : `/${item.filename}`}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <h5 className="font-bold text-xs sm:text-sm text-white truncate">
+                              {item.title}
+                            </h5>
+                            <span className="text-[11px] text-amber-400 font-medium">
+                              {item.category} • {item.subtitle || 'Poster assignment'}
+                            </span>
+                          </div>
                         </div>
-                        <div className="w-14 h-14 rounded-lg bg-slate-900 overflow-hidden shrink-0 border border-slate-700">
-                          <img
-                            src={item.filename.startsWith('data:') || item.filename.startsWith('http') ? item.filename : `/${item.filename}`}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <h5 className="font-bold text-xs sm:text-sm text-white truncate">
-                            {item.title}
-                          </h5>
-                          <span className="text-[11px] text-amber-400 font-medium">
-                            {item.category} • {item.subtitle || 'Poster assignment'}
-                          </span>
+
+                        {/* Controls: Edit, Up, Down, Delete */}
+                        <div className="flex items-center gap-1.5 self-end sm:self-center">
+                          <button
+                            type="button"
+                            onClick={() => (editingGraphicId === item.id ? setEditingGraphicId(null) : handleStartEditGraphic(item))}
+                            className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all ${
+                              editingGraphicId === item.id
+                                ? 'bg-amber-500 text-slate-950 border-amber-500'
+                                : 'border-slate-800 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400'
+                            }`}
+                            title="গ্রাফিক ডিজাইনের তথ্য পরিবর্তন বা এডিট করুন"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span className="text-[11px] hidden sm:inline">{editingGraphicId === item.id ? 'বাতিল' : 'পরিবর্তন'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => reorderGraphicItem(item.id, 'prev')}
+                            disabled={idx === 0}
+                            className="p-2 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="উপরে নিন"
+                          >
+                            <MoveUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => reorderGraphicItem(item.id, 'next')}
+                            disabled={idx === data.graphicItems.length - 1}
+                            className="p-2 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="নিচে নিন"
+                          >
+                            <MoveDown className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`"${item.title}" ডিজাইনটি মুছে ফেলতে চান?`)) {
+                                deleteGraphicItem(item.id);
+                              }
+                            }}
+                            disabled={data.graphicItems.length <= 1}
+                            className="p-2 rounded-lg border border-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="ডিজাইন মুছুন"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Controls: Up, Down, Delete */}
-                      <div className="flex items-center gap-1.5 self-end sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => reorderGraphicItem(item.id, 'prev')}
-                          disabled={idx === 0}
-                          className="p-2 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="উপরে নিন"
-                        >
-                          <MoveUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => reorderGraphicItem(item.id, 'next')}
-                          disabled={idx === data.graphicItems.length - 1}
-                          className="p-2 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="নিচে নিন"
-                        >
-                          <MoveDown className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`"${item.title}" ডিজাইনটি মুছে ফেলতে চান?`)) {
-                              deleteGraphicItem(item.id);
-                            }
-                          }}
-                          disabled={data.graphicItems.length <= 1}
-                          className="p-2 rounded-lg border border-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="ডিজাইন মুছুন"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {/* Inline Graphic Editor Drawer */}
+                      {editingGraphicId === item.id && (
+                        <div className="w-full mt-2 pt-3 border-t border-slate-800 bg-slate-900/60 p-3 rounded-xl space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">ডিজাইনের নাম (Title)</label>
+                              <input
+                                type="text"
+                                value={editGraphicTitle}
+                                onChange={(e) => setEditGraphicTitle(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">ক্যাটাগরি (Category)</label>
+                              <input
+                                type="text"
+                                value={editGraphicCategory}
+                                onChange={(e) => setEditGraphicCategory(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">সাবটাইটেল / বিবরণ</label>
+                              <input
+                                type="text"
+                                value={editGraphicSubtitle}
+                                onChange={(e) => setEditGraphicSubtitle(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs focus:ring-1 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">ফিট মোড (Fit Mode)</label>
+                              <select
+                                value={editGraphicFit}
+                                onChange={(e) => setEditGraphicFit(e.target.value as 'cover' | 'contain')}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs focus:ring-1 focus:ring-amber-500"
+                              >
+                                <option value="cover">Cover (বক্স পূর্ণ করবে)</option>
+                                <option value="contain">Contain (পুরো ছবি অক্ষত দেখাবে)</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingGraphicId(null)}
+                              className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                            >
+                              বাতিল
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEditGraphic(item.id)}
+                              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
+                            >
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>পরিবর্তন সংরক্ষণ করুন</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1092,12 +1431,26 @@ export const AdminDashboardModal: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      WhatsApp লিংক (যেমন: https://wa.me/...)
+                      WhatsApp সরাসরি চ্যাট লিংক (যেমন: https://wa.me/8801700000000)
                     </label>
                     <input
                       type="text"
                       value={data.personalInfo.whatsappUrl}
                       onChange={(e) => updatePersonalInfo({ whatsappUrl: e.target.value })}
+                      placeholder="https://wa.me/8801700000000"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-white text-xs font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      WhatsApp মোবাইল নাম্বার (যেমন: +880 1700-000000)
+                    </label>
+                    <input
+                      type="text"
+                      value={data.personalInfo.whatsappNumber || ''}
+                      onChange={(e) => updatePersonalInfo({ whatsappNumber: e.target.value })}
+                      placeholder="+880 1700-000000"
                       className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-white text-xs font-mono"
                     />
                   </div>
@@ -1108,6 +1461,77 @@ export const AdminDashboardModal: React.FC = () => {
                       type="email"
                       value={data.personalInfo.email}
                       onChange={(e) => updatePersonalInfo({ email: e.target.value })}
+                      placeholder="sohanahammad.connect@gmail.com"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-white text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1 text-blue-400">
+                      ভিয়েন্স লিংক (Behance Portfolio URL)
+                    </label>
+                    <input
+                      type="text"
+                      value={data.personalInfo.behanceUrl || ''}
+                      onChange={(e) => updatePersonalInfo({ behanceUrl: e.target.value })}
+                      placeholder="https://www.behance.net/sohanahammad"
+                      className="w-full px-3 py-2 rounded-xl border border-blue-500/50 bg-slate-900 text-white text-xs font-mono focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1 text-red-400">
+                      ইউটিউব চ্যানেল লিংক (YouTube Channel URL)
+                    </label>
+                    <input
+                      type="text"
+                      value={data.personalInfo.youtubeChannelUrl || ''}
+                      onChange={(e) => updatePersonalInfo({ youtubeChannelUrl: e.target.value })}
+                      placeholder="https://www.youtube.com/@sohanahammad"
+                      className="w-full px-3 py-2 rounded-xl border border-red-500/50 bg-slate-900 text-white text-xs font-mono focus:border-red-400 focus:ring-1 focus:ring-red-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">ইনস্টাগ্রাম লিংক (Instagram - ঐচ্ছিক)</label>
+                    <input
+                      type="text"
+                      value={data.personalInfo.instagramUrl || ''}
+                      onChange={(e) => updatePersonalInfo({ instagramUrl: e.target.value })}
+                      placeholder="https://www.instagram.com/..."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-white text-xs font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">লিংকডইন লিংক (LinkedIn - ঐচ্ছিক)</label>
+                    <input
+                      type="text"
+                      value={data.personalInfo.linkedinUrl || ''}
+                      onChange={(e) => updatePersonalInfo({ linkedinUrl: e.target.value })}
+                      placeholder="https://www.linkedin.com/in/..."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-white text-xs font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">লোকেশন (Location)</label>
+                    <input
+                      type="text"
+                      value={data.personalInfo.location || ''}
+                      onChange={(e) => updatePersonalInfo({ location: e.target.value })}
+                      placeholder="Dhaka, Bangladesh"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-white text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">প্রাপ্যতা (Availability)</label>
+                    <input
+                      type="text"
+                      value={data.personalInfo.availability || ''}
+                      onChange={(e) => updatePersonalInfo({ availability: e.target.value })}
+                      placeholder="Available for Worldwide Remote & Freelance Projects"
                       className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-white text-xs"
                     />
                   </div>
@@ -1405,15 +1829,36 @@ export const AdminDashboardModal: React.FC = () => {
                 </div>
 
                 {/* Download Button */}
-                <div className="pt-2">
-                  <a
-                    href="/sohan-portfolio-latest.zip"
-                    download="sohan-portfolio-latest.zip"
-                    className="inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/25 transition-all cursor-pointer active:scale-98"
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadFreshZip}
+                    disabled={isBuildingZip}
+                    className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/25 transition-all cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Download className="w-5 h-5" />
-                    <span>{language === 'bn' ? '১-ক্লিকে সম্পূর্ণ প্রজেক্ট ZIP ডাউনলোড করুন' : 'Download Complete Project (.ZIP)'}</span>
-                  </a>
+                    {isBuildingZip ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        <span>{language === 'bn' ? 'সব ভিডিও ও লিংক সিঙ্ক করে নতুন ZIP তৈরি হচ্ছে...' : 'Syncing all videos & links into new ZIP...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5" />
+                        <span>{language === 'bn' ? '১-ক্লিকে সব লিংক ও ভিডিও সহ নতুন প্রজেক্ট ZIP ডাউনলোড করুন' : 'Download Complete Project (.ZIP)'}</span>
+                      </>
+                    )}
+                  </button>
+
+                  {zipDownloadSuccess && (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fade-in">
+                      <Check className="w-4 h-4 shrink-0 stroke-[3]" />
+                      <span>
+                        {language === 'bn'
+                          ? 'আপনার সব ইউটিউব লিংক, বেহ্যান্স লিংক, হোয়াটসঅ্যাপ নাম্বার, ভিডিও ও গ্রাফিক্স সফলভাবে কোডে সেভ হয়েছে এবং নতুন জিপ ডাউনলোড শুরু হয়েছে!'
+                          : 'All your YouTube links, Behance links, WhatsApp numbers, videos, and graphics have been packaged into your fresh ZIP file!'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 3 Simple Steps for Vercel Update */}
@@ -1442,32 +1887,67 @@ export const AdminDashboardModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* JSON Backup Card */}
-              <div className="p-5 rounded-2xl border border-slate-800 bg-slate-950/60">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center font-bold">
+              {/* JSON Backup & Restore Card */}
+              <div className="p-5 rounded-2xl border border-slate-800 bg-slate-950/60 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center font-bold shrink-0">
                     <FileCode className="w-5 h-5" />
                   </div>
                   <div>
                     <h4 className="font-display font-bold text-sm text-white">
-                      {language === 'bn' ? 'পোর্টফোলিও ডাটা ব্যাকআপ (JSON Backup)' : 'Portfolio Data Backup (JSON)'}
+                      {language === 'bn' ? 'ডাটা ব্যাকআপ ও রিস্টোর (Backup & Restore)' : 'Data Backup & Restore (JSON)'}
                     </h4>
                     <p className="text-xs text-slate-400">
                       {language === 'bn'
-                        ? 'আপনার সমস্ত ভিডিও, গ্রাফিক্স ও ব্যক্তিগত তথ্য একটি ব্যাকআপ ফাইলে সেভ করে রাখতে পারেন।'
-                        : 'Save all your video items, graphics, and portfolio profile in a structured JSON file.'}
+                        ? 'আপনার সমস্ত ভিডিও, গ্রাফিক্স ও ব্যক্তিগত তথ্য ডাউনলোড করে রাখতে পারেন অথবা আগের কোনো ব্যাকআপ রিস্টোর করতে পারেন।'
+                        : 'Download a backup JSON file or restore previous portfolio data instantly.'}
                     </p>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleDownloadBackup}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow"
-                >
-                  <Download className="w-4 h-4 text-amber-400" />
-                  <span>{language === 'bn' ? 'JSON ব্যাকআপ ডাউনলোড করুন' : 'Download Backup JSON File'}</span>
-                </button>
+                {/* Import Status Alert */}
+                {importStatus && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+                      importStatus.startsWith('success')
+                        ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300'
+                        : 'bg-rose-500/15 border border-rose-500/40 text-rose-300'
+                    }`}
+                  >
+                    {importStatus.startsWith('success') ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                    <span>{importStatus.split(':')[1]}</span>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Download Backup */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadBackup}
+                    className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow"
+                  >
+                    <Download className="w-4 h-4 text-amber-400" />
+                    <span>{language === 'bn' ? 'JSON ব্যাকআপ ডাউনলোড' : 'Download Backup (.JSON)'}</span>
+                  </button>
+
+                  {/* Restore / Upload Backup */}
+                  <button
+                    type="button"
+                    onClick={() => backupFileInputRef.current?.click()}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>{language === 'bn' ? 'ব্যাকআপ ফাইল আপলোড/রিস্টোর করুন' : 'Upload & Restore Backup (.JSON)'}</span>
+                  </button>
+
+                  <input
+                    type="file"
+                    ref={backupFileInputRef}
+                    onChange={handleImportFile}
+                    accept=".json,application/json"
+                    className="hidden"
+                  />
+                </div>
               </div>
 
               {/* 1-Click Code Copy Card */}

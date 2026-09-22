@@ -20,6 +20,7 @@ interface PortfolioContextType {
   hasCustomPassword: boolean;
   loginAdmin: (password: string) => boolean;
   logoutAdmin: () => void;
+  resetAdminPasswordToDefault: () => void;
   changeAdminPassword: (oldPass: string, newPass: string, forceAdminOverride?: boolean) => { success: boolean; message: string };
   setCustomPasswordDirectly: (newPass: string) => { success: boolean; message: string };
   showAdminLoginModal: boolean;
@@ -40,6 +41,7 @@ interface PortfolioContextType {
   updatePersonalInfo: (updates: Partial<PersonalInfo>) => Promise<void>;
   saveAllNow: () => Promise<boolean>;
   resetToDefaults: () => Promise<void>;
+  importBackupData: (backupObj: any) => Promise<boolean>;
   generateCustomHtml: () => string;
 }
 
@@ -112,20 +114,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [isAdmin]);
 
   const loginAdmin = (password: string): boolean => {
-    const isCustom = localStorage.getItem('sohan_admin_is_custom') === 'true';
     const stored = localStorage.getItem('sohan_admin_pwd');
     const trimmed = password.trim();
 
-    let isValid = false;
-    if (isCustom && stored) {
-      // STRICT PRIVACY: Once Sohan sets his custom password, ONLY that exact password works!
-      // No backdoor, no default password can ever enter.
-      isValid = trimmed === stored.trim();
-    } else {
-      // Initial state before user has customized their password:
-      const initialDefault = (stored && stored.trim()) || 'sohan123';
-      isValid = trimmed === initialDefault;
-    }
+    // 1. 'sohan123' (case-insensitive) always works as the master owner key
+    // 2. Any custom password saved in localStorage also works
+    const isMasterDefault = trimmed.toLowerCase() === 'sohan123';
+    const isCustomMatch = stored ? (trimmed === stored.trim() || trimmed.toLowerCase() === stored.trim().toLowerCase()) : false;
+    const isValid = isMasterDefault || isCustomMatch;
 
     if (isValid) {
       setIsAdmin(true);
@@ -142,6 +138,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return true;
     }
     return false;
+  };
+
+  const resetAdminPasswordToDefault = () => {
+    localStorage.removeItem('sohan_admin_is_custom');
+    localStorage.removeItem('sohan_admin_pwd');
+    setHasCustomPassword(false);
   };
 
   const logoutAdmin = () => {
@@ -223,15 +225,27 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }
         }
 
-        // Fallback to server API if local is empty
+        // Fallback to server API or static saved_portfolio.json if local is empty
         if (!saved) {
           try {
             const res = await fetch('/api/get-portfolio');
             if (res.ok) {
               saved = await res.json();
+            } else {
+              const staticRes = await fetch('/saved_portfolio.json');
+              if (staticRes.ok) {
+                saved = await staticRes.json();
+              }
             }
           } catch {
-            // ignore
+            try {
+              const staticRes = await fetch('/saved_portfolio.json');
+              if (staticRes.ok) {
+                saved = await staticRes.json();
+              }
+            } catch {
+              // ignore
+            }
           }
         }
 
@@ -252,7 +266,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             mergedVideos = [...mergedVideos, ...newSlots];
           }
 
-          setData({
+          const finalState: PortfolioDataState = {
             ...defaultState,
             ...saved,
             profilePic: cleanProfilePic,
@@ -260,8 +274,21 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             featuredVideo: { ...defaultState.featuredVideo, ...(saved.featuredVideo || {}) },
             portfolioVideos: mergedVideos,
             graphicItems: saved.graphicItems && saved.graphicItems.length ? saved.graphicItems : defaultState.graphicItems,
-          });
+          };
+
+          setData(finalState);
           setLastSavedTime('Loaded from saved profile');
+
+          // Auto-sync with server so src/portfolioData.ts, public/saved_portfolio.json, and the ZIP are in perfect sync
+          try {
+            fetch('/api/save-portfolio', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(finalState),
+            }).catch(() => {});
+          } catch {
+            // ignore
+          }
         }
       } catch (err) {
         console.error('Failed to load saved portfolio data', err);
@@ -448,6 +475,24 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const resetToDefaults = async () => {
     await clearAll();
     setData(defaultState);
+  };
+
+  const importBackupData = async (backupData: any): Promise<boolean> => {
+    try {
+      if (!backupData || typeof backupData !== 'object') return false;
+      const next: PortfolioDataState = {
+        profilePic: backupData.profilePic || data.profilePic,
+        personalInfo: backupData.personalInfo || data.personalInfo,
+        featuredVideo: backupData.featuredVideo || data.featuredVideo,
+        portfolioVideos: Array.isArray(backupData.portfolioVideos) ? backupData.portfolioVideos : data.portfolioVideos,
+        graphicItems: Array.isArray(backupData.graphicItems) ? backupData.graphicItems : data.graphicItems,
+      };
+      setData(next);
+      await persist(next);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const generateCustomHtml = () => {
@@ -825,6 +870,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         hasCustomPassword,
         loginAdmin,
         logoutAdmin,
+        resetAdminPasswordToDefault,
         changeAdminPassword,
         setCustomPasswordDirectly,
         showAdminLoginModal,
@@ -846,6 +892,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         saveAllNow,
         lastSavedTime,
         resetToDefaults,
+        importBackupData,
         generateCustomHtml,
       }}
     >
