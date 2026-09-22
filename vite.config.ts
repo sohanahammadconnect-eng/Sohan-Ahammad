@@ -53,6 +53,22 @@ function portfolioApiPlugin(): Plugin {
               const data = JSON.parse(body);
               fs.writeFileSync(savedPortfolioPath, JSON.stringify(data, null, 2), 'utf-8');
 
+              // Synchronously update public/profile.jpg so Telegram & WhatsApp crawlers get the latest photo
+              if (data.profilePic && typeof data.profilePic === 'string' && data.profilePic.includes('base64,')) {
+                try {
+                  const b64 = data.profilePic.split('base64,')[1];
+                  const buffer = Buffer.from(b64, 'base64');
+                  fs.writeFileSync(path.resolve(__dirname, 'public/profile.jpg'), buffer);
+                  fs.writeFileSync(path.resolve(__dirname, 'profile.jpg'), buffer);
+                  const distDir = path.resolve(__dirname, 'dist');
+                  if (fs.existsSync(distDir)) {
+                    fs.writeFileSync(path.resolve(distDir, 'profile.jpg'), buffer);
+                  }
+                } catch (imgErr) {
+                  console.error('Failed to sync profile.jpg from base64:', imgErr);
+                }
+              }
+
               // Automatically regenerate src/portfolioData.ts and re-package public/sohan-portfolio-latest.zip
               try {
                 execSync('python3 scripts/update_portfolio_and_zip.py', { cwd: __dirname });

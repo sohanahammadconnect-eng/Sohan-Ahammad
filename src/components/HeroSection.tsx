@@ -11,7 +11,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ theme }) => {
   const isDark = theme === 'dark';
-  const { data, updateProfilePic, openEditModal, updateFeaturedVideo, t, language } = usePortfolio();
+  const { data, updateProfilePic, openEditModal, updateFeaturedVideo, t, language, isAdmin } = usePortfolio();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showQuickLink, setShowQuickLink] = useState(false);
@@ -101,19 +101,23 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ theme }) => {
                     <span className="font-display font-black text-4xl sm:text-5xl md:text-6xl tracking-wider text-amber-400 drop-shadow-md">
                       SA
                     </span>
-                    <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 mt-2 bg-black/60 px-3 py-1 rounded-full border border-white/10">
-                      <Camera className="w-3.5 h-3.5 text-amber-400" />
-                      <span>ছবি আপলোড করুন</span>
-                    </span>
+                    {isAdmin && (
+                      <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 mt-2 bg-black/60 px-3 py-1 rounded-full border border-white/10">
+                        <Camera className="w-3.5 h-3.5 text-amber-400" />
+                        <span>ছবি আপলোড করুন</span>
+                      </span>
+                    )}
                   </div>
                 )}
 
-                {/* Hover overlay for uploading/changing profile picture */}
-                <div className="absolute inset-0 bg-slate-950/85 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-semibold gap-1.5 text-center px-3">
-                  <Camera className="w-7 h-7 text-amber-400 animate-bounce" />
-                  <span>{profilePic ? 'ছবি পরিবর্তন করতে ক্লিক করুন' : 'ছবি আপলোড করতে ক্লিক করুন'}</span>
-                  <span className="text-[10px] text-slate-400">(Click to Upload Image)</span>
-                </div>
+                {/* Hover overlay for uploading/changing profile picture - ONLY for ADMIN */}
+                {isAdmin && (
+                  <div className="absolute inset-0 bg-slate-950/85 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-semibold gap-1.5 text-center px-3">
+                    <Camera className="w-7 h-7 text-amber-400 animate-bounce" />
+                    <span>{profilePic ? 'ছবি পরিবর্তন করতে ক্লিক করুন' : 'ছবি আপলোড করতে ক্লিক করুন'}</span>
+                    <span className="text-[10px] text-slate-400">(Click to Upload Image)</span>
+                  </div>
+                )}
               </div>
 
               {/* Hidden file input for uploading profile pic */}
@@ -126,15 +130,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ theme }) => {
                 id="profile-file-input"
               />
 
-              {/* Camera change photo floating badge */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                title={profilePic ? "ছবি পরিবর্তন করুন (Change Photo)" : "ছবি আপলোড করুন (Upload Photo)"}
-                className="absolute -top-2 -right-2 p-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xl transition-transform hover:scale-110 flex items-center justify-center cursor-pointer border-2 border-slate-950"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
+              {/* Camera change photo floating badge - ONLY for ADMIN */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title={profilePic ? "ছবি পরিবর্তন করুন (Change Photo)" : "ছবি আপলোড করুন (Upload Photo)"}
+                  className="absolute -top-2 -right-2 p-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xl transition-transform hover:scale-110 flex items-center justify-center cursor-pointer border-2 border-slate-950 z-10"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+              )}
 
               {/* Available badge */}
               <div
@@ -160,24 +166,29 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ theme }) => {
                   <span>{personalInfo.role}</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-xs font-semibold text-amber-300 hover:text-amber-200 flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-3 py-1 rounded-full transition-all cursor-pointer shadow-sm"
-                  title={t('hero_change_photo')}
-                >
-                  <Camera className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{t('hero_change_photo')}</span>
-                </button>
+                {/* Admin-only edit buttons */}
+                {isAdmin && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs font-semibold text-amber-300 hover:text-amber-200 flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-3 py-1 rounded-full transition-all cursor-pointer shadow-sm"
+                      title={t('hero_change_photo')}
+                    >
+                      <Camera className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{t('hero_change_photo')}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => openEditModal('profile')}
-                  className="text-xs text-amber-400/90 hover:text-amber-400 flex items-center gap-1 underline underline-offset-4 ml-1 cursor-pointer font-medium"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>{t('hero_edit_info')}</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => openEditModal('profile')}
+                      className="text-xs text-amber-400/90 hover:text-amber-400 flex items-center gap-1 underline underline-offset-4 ml-1 cursor-pointer font-medium"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>{t('hero_edit_info')}</span>
+                    </button>
+                  </>
+                )}
               </div>
 
               <h1
@@ -243,39 +254,44 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ theme }) => {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowQuickLink(!showQuickLink);
-                  setQuickLinkVal(featuredVideo.youtubeId ? `https://www.youtube.com/watch?v=${featuredVideo.youtubeId}` : '');
-                  setLinkError(null);
-                  setLinkSuccess(false);
-                }}
-                title={language === 'bn' ? 'ফিচারড ভিডিওতে সরাসরি ইউটিউব লিংক জমা দিন' : 'Submit YouTube link for featured showreel'}
-                className={`text-xs font-bold px-3 py-1 rounded-lg border transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${
-                  showQuickLink
-                    ? 'bg-amber-500 text-slate-950 border-amber-400'
-                    : isDark
-                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
-                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                }`}
-              >
-                <Link2 className="w-3.5 h-3.5" />
-                <span>{language === 'bn' ? 'লিংক জমা দিন' : 'Submit Link'}</span>
-              </button>
+              {/* Admin-only quick link and edit buttons */}
+              {isAdmin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowQuickLink(!showQuickLink);
+                      setQuickLinkVal(featuredVideo.youtubeId ? `https://www.youtube.com/watch?v=${featuredVideo.youtubeId}` : '');
+                      setLinkError(null);
+                      setLinkSuccess(false);
+                    }}
+                    title={language === 'bn' ? 'ফিচারড ভিডিওতে সরাসরি ইউটিউব লিংক জমা দিন' : 'Submit YouTube link for featured showreel'}
+                    className={`text-xs font-bold px-3 py-1 rounded-lg border transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                      showQuickLink
+                        ? 'bg-amber-500 text-slate-950 border-amber-400'
+                        : isDark
+                        ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                    }`}
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>{language === 'bn' ? 'লিংক জমা দিন' : 'Submit Link'}</span>
+                  </button>
 
-              <button
-                onClick={() => openEditModal('featured')}
-                title={t('featured_change_video')}
-                className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 shadow-sm ${
-                  isDark
-                    ? 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
-                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>{t('edit')}</span>
-              </button>
+                  <button
+                    onClick={() => openEditModal('featured')}
+                    title={t('featured_change_video')}
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 shadow-sm ${
+                      isDark
+                        ? 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                        : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>{t('edit')}</span>
+                  </button>
+                </>
+              )}
               <span
                 className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
                   isDark ? 'bg-slate-800/80 text-slate-300' : 'bg-slate-200 text-slate-700'
@@ -286,8 +302,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ theme }) => {
             </div>
           </div>
 
-          {/* Quick Link Submission Drawer for Featured Video */}
-          {showQuickLink && (
+          {/* Quick Link Submission Drawer for Featured Video - ONLY FOR ADMIN */}
+          {isAdmin && showQuickLink && (
             <div
               className={`p-4 rounded-xl border mb-4 transition-all animate-fade-in ${
                 isDark

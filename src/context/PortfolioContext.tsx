@@ -253,10 +253,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const isOldGeneratedPic =
             saved.profilePic &&
             (saved.profilePic.includes('profile_photo') ||
-             saved.profilePic.includes('sohan_exact') ||
-             saved.profilePic.includes('profile.jpg'));
+             saved.profilePic.includes('sohan_exact'));
 
-          const cleanProfilePic = isOldGeneratedPic ? '' : (saved.profilePic || '');
+          const cleanProfilePic = isOldGeneratedPic ? '/profile.jpg' : (saved.profilePic || '/profile.jpg');
 
           let mergedVideos = saved.portfolioVideos && saved.portfolioVideos.length ? saved.portfolioVideos : defaultState.portfolioVideos;
           // Ensure new slots (up to 10) are included for users with existing cached state

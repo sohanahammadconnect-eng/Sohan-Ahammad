@@ -30,6 +30,8 @@ import {
   EyeOff,
   ShieldAlert,
   Edit3,
+  RefreshCw,
+  Share2,
 } from 'lucide-react';
 import { usePortfolio } from '../context/PortfolioContext';
 import { extractYouTubeId } from '../utils/mediaStorage';
@@ -98,6 +100,19 @@ export const AdminDashboardModal: React.FC = () => {
   // Profile Form State
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
+
+  const handleCopyFreshLink = () => {
+    const origin = typeof window !== 'undefined' && window.location.origin && window.location.origin.startsWith('http')
+      ? window.location.origin
+      : 'https://sohan-ahammad.vercel.app';
+    const freshUrl = `${origin}/?v=${Date.now()}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(freshUrl);
+      setCopiedShareLink(true);
+      setTimeout(() => setCopiedShareLink(false), 2500);
+    }
+  };
 
   // Copy code toast
   const [copiedCode, setCopiedCode] = useState(false);
@@ -1375,6 +1390,139 @@ export const AdminDashboardModal: React.FC = () => {
                       ✓ প্রোফাইল ছবি আপডেট হয়েছে!
                     </span>
                   )}
+                </div>
+              </div>
+
+              {/* Telegram & WhatsApp Social Share Preview Card (সোশ্যাল মিডিয়া শেয়ারিং প্রিভিউ) */}
+              <div className="p-5 rounded-2xl border border-slate-800 bg-slate-950/70 space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                      <Share2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-display font-bold text-sm text-white">
+                        সোশ্যাল মিডিয়া প্রিভিউ (Telegram / WhatsApp Link Share Preview)
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        টেলিগ্রাম বা হোয়াটসঅ্যাপে পোর্টফোলিওর লিংক পাঠালে ঠিক যেভাবে ছবিটি ভেসে উঠবে:
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1 shrink-0">
+                    <Check className="w-3 h-3" />
+                    <span>og:image সিঙ্কড (/profile.jpg)</span>
+                  </span>
+                </div>
+
+                {/* Telegram/WhatsApp Style Visual Preview Bubble (যেমন টেলিগ্রামে দেখায়) */}
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 max-w-md mx-auto">
+                  <div className="text-[11px] text-emerald-400 font-mono mb-1.5 flex items-center justify-between">
+                    <span className="truncate">
+                      {typeof window !== 'undefined' ? window.location.origin : 'https://sohan-ahammad.vercel.app'}
+                    </span>
+                    <span className="text-[10px] text-slate-400">Telegram / WhatsApp Card</span>
+                  </div>
+
+                  <div className="rounded-xl border border-emerald-500/40 bg-slate-900/90 overflow-hidden shadow-xl">
+                    <div className="p-3 border-b border-slate-800 space-y-1">
+                      <p className="text-[11px] text-emerald-400/90 font-medium">
+                        {typeof window !== 'undefined' ? window.location.host : 'sohan-ahammad.vercel.app'}
+                      </p>
+                      <h5 className="font-bold text-xs sm:text-sm text-white">
+                        {data.personalInfo.name} - Video Editor Portfolio
+                      </h5>
+                      <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-2">
+                        Portfolio website of {data.personalInfo.name}, featuring video editing trailers, YouTube projects, graphic & poster designs, and contact information.
+                      </p>
+                    </div>
+
+                    {/* The Live Photo */}
+                    <div className="w-full aspect-[16/10] sm:aspect-[16/9] bg-slate-950 relative overflow-hidden flex items-center justify-center">
+                      {data.profilePic ? (
+                        <img
+                          src={data.profilePic}
+                          alt="Telegram/WhatsApp Social Share Preview"
+                          className="w-full h-full object-cover object-center"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-500 p-4">
+                          <User className="w-12 h-12 mb-2 text-slate-600" />
+                          <span className="text-xs">কোনো ছবি সেট করা নেই</span>
+                        </div>
+                      )}
+                      <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-sm text-[10px] font-mono text-amber-400 border border-amber-500/30">
+                        লাইভ প্রিভিউ: /profile.jpg
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleCopyFreshLink}
+                    className="p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    {copiedShareLink ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-400">তাজা লিংক কপি হয়েছে!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span>তাজা লিংক কপি করুন (নতুন ছবি সহ)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => profilePhotoInputRef.current?.click()}
+                    className="p-3 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Camera className="w-4 h-4 text-amber-400" />
+                    <span>নতুন ছবি আপলোড করুন</span>
+                  </button>
+                </div>
+
+                {/* Telegram & WhatsApp Cache Clearing Tips */}
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>টেলিগ্রাম ও হোয়াটসঅ্যাপে ছবি রিফ্রেশ করার নিয়ম:</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-slate-400 text-[11px] pl-1">
+                    <li>
+                      <strong className="text-white">টেলিগ্রামে তাৎক্ষণিক ছবি রিফ্রেশ:</strong> টেলিগ্রাম একবার লিংক পাঠালে পুরোনো ছবি ক্যাশ করে রাখে। নতুন ছবি দেখতে টেলিগ্রামের সার্চে <strong className="text-amber-400">@WebpageBot</strong> লিখুন এবং আপনার লিংকটি পাঠান। টেলিগ্রাম সঙ্গে সঙ্গে নতুন প্রিভিউ আপডেট করে দেবে।
+                    </li>
+                    <li>
+                      <strong className="text-white">হোয়াটসঅ্যাপের জন্য:</strong> উপরের <strong className="text-amber-400">"তাজা লিংক কপি করুন"</strong> বাটনে ক্লিক করে লিংক শেয়ার করলে লিংকের সাথে নতুন কোড যুক্ত থাকায় হোয়াটসঅ্যাপ সরাসরি আপনার নতুন ছবি প্রদর্শন করবে।
+                    </li>
+                  </ul>
+                  <div className="pt-1 flex items-center gap-2 flex-wrap">
+                    <a
+                      href="https://t.me/WebpageBot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-400 hover:text-sky-300 underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Telegram @WebpageBot ওপেন করুন</span>
+                    </a>
+                    <span className="text-slate-600">•</span>
+                    <a
+                      href="/profile.jpg"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>সরাসরি profile.jpg দেখুন</span>
+                    </a>
+                  </div>
                 </div>
               </div>
 

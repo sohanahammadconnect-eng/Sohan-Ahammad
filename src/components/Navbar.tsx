@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sun, Moon, Sparkles, Sliders, Menu, X, Video, Film, Mail, ExternalLink, Lock, ShieldCheck, LayoutDashboard, Languages } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Sun, Moon, Sparkles, Sliders, Menu, X, Video, Film, Mail, ExternalLink, Lock, ShieldCheck, LayoutDashboard, Languages, Camera, User } from 'lucide-react';
 import { ThemeMode } from '../types';
 import { usePortfolio } from '../context/PortfolioContext';
 
@@ -12,6 +12,7 @@ export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme }) => {
   const isDark = theme === 'dark';
   const {
     data,
+    updateProfilePic,
     openEditModal,
     isAdmin,
     openAdminDashboard,
@@ -22,8 +23,23 @@ export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme }) => {
     setLanguage,
     t,
   } = usePortfolio();
-  const { personalInfo } = data;
+  const { personalInfo, profilePic } = data;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleNavPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (result) {
+          updateProfilePic(result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <header
@@ -36,12 +52,71 @@ export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme }) => {
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
         
-        {/* Brand / Logo */}
-        <a href="#featured-work" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-rose-500 flex items-center justify-center text-slate-950 font-display font-black text-xl shadow-md group-hover:scale-105 transition-transform">
-            {personalInfo.name.charAt(0)}
+        {/* Brand / Logo & Profile Photo Frame */}
+        <div className="flex items-center gap-3">
+          {/* Profile Photo Slot (ঘর) */}
+          <div className="relative group shrink-0">
+            <div
+              onClick={() => {
+                if (isAdmin) {
+                  navPhotoInputRef.current?.click();
+                }
+              }}
+              title={
+                isAdmin
+                  ? (profilePic ? 'প্রোফাইল ছবি পরিবর্তন করতে ক্লিক করুন' : 'প্রোফাইল ছবি আপলোড করতে ক্লিক করুন')
+                  : personalInfo.name
+              }
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl overflow-hidden ring-2 transition-all flex items-center justify-center shadow-lg relative ${
+                profilePic
+                  ? 'ring-amber-500/60 bg-slate-900'
+                  : 'ring-amber-500/40 bg-gradient-to-tr from-amber-500 via-amber-400 to-rose-500'
+              } ${isAdmin ? 'cursor-pointer hover:scale-105 hover:ring-amber-400' : ''}`}
+            >
+              {profilePic ? (
+                <img
+                  src={profilePic}
+                  alt={personalInfo.name}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover object-center"
+                />
+              ) : (
+                <span className="font-display font-black text-xl text-slate-950 select-none">
+                  {personalInfo.name.charAt(0)}
+                </span>
+              )}
+
+              {/* Admin Camera Hover Overlay */}
+              {isAdmin && (
+                <div className="absolute inset-0 bg-slate-950/75 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-amber-400">
+                  <Camera className="w-5 h-5" />
+                </div>
+              )}
+            </div>
+
+            {/* Admin Floating Camera Badge */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => navPhotoInputRef.current?.click()}
+                title="ছবি আপলোড / পরিবর্তন করুন"
+                className="absolute -bottom-1 -right-1 p-1 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md border border-slate-900 cursor-pointer transition-transform hover:scale-110"
+              >
+                <Camera className="w-3 h-3" />
+              </button>
+            )}
+
+            {/* Hidden Input for Nav Photo Upload */}
+            <input
+              type="file"
+              ref={navPhotoInputRef}
+              onChange={handleNavPhotoUpload}
+              accept="image/*"
+              className="hidden"
+            />
           </div>
-          <div className="flex flex-col">
+
+          <a href="#featured-work" className="flex flex-col group">
             <span className="font-display font-bold text-base sm:text-lg tracking-tight group-hover:text-amber-500 transition-colors">
               {personalInfo.name}
             </span>
@@ -49,8 +124,8 @@ export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme }) => {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>{personalInfo.role}</span>
             </span>
-          </div>
-        </a>
+          </a>
+        </div>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">

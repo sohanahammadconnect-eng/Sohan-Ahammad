@@ -36,6 +36,24 @@ export const GRAPHIC_ITEMS: GraphicItem[] = {json.dumps(graphic_items, indent=2,
         f.write(ts_content)
     print("Updated", ts_data_path)
 
+    # Sync profile.jpg for OpenGraph / Telegram / WhatsApp link previews
+    profile_pic = data.get("profilePic", "")
+    if profile_pic and "base64," in profile_pic:
+        try:
+            import base64
+            _, b64data = profile_pic.split("base64,", 1)
+            img_bytes = base64.b64decode(b64data)
+            with open("public/profile.jpg", "wb") as out_img:
+                out_img.write(img_bytes)
+            with open("profile.jpg", "wb") as out_img:
+                out_img.write(img_bytes)
+            if os.path.exists("dist"):
+                with open("dist/profile.jpg", "wb") as out_img:
+                    out_img.write(img_bytes)
+            print("Updated profile.jpg for OpenGraph/Telegram/WhatsApp previews (size:", len(img_bytes), "bytes)")
+        except Exception as e:
+            print("Warning: failed to extract profile.jpg from base64:", e)
+
     # Now bundle into ZIP
     excluded_dirs = {"node_modules", "dist", ".git", ".next", ".cache", "__pycache__"}
     excluded_files = {"sohan-portfolio-latest.zip", "sohan-portfolio-latest.tmp.zip", "sohan-portfolio.zip"}

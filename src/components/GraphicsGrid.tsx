@@ -102,33 +102,37 @@ export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold border border-amber-500/20">
                 {graphics.length} {language === 'bn' ? 'টি ডিজাইন' : 'Designs'}
               </span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isAdmin) {
-                    setShowAdminLoginModal(true);
-                  } else {
-                    setShowAdminDashboard(true);
-                  }
-                }}
-                className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
-                  isDark
-                    ? 'bg-slate-900 border-slate-700 text-amber-400 hover:bg-slate-800'
-                    : 'bg-white border-slate-300 text-amber-600 hover:bg-slate-100'
-                }`}
-              >
-                <Edit3 className="w-3 h-3" />
-                <span>{t('graphics_btn_change')}</span>
-              </button>
+              {isAdmin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isAdmin) {
+                        setShowAdminLoginModal(true);
+                      } else {
+                        setShowAdminDashboard(true);
+                      }
+                    }}
+                    className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isDark
+                        ? 'bg-slate-900 border-slate-700 text-amber-400 hover:bg-slate-800'
+                        : 'bg-white border-slate-300 text-amber-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>{t('graphics_btn_change')}</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={handleAddSlideClick}
-                className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{t('graphics_btn_add_slide')}</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={handleAddSlideClick}
+                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{t('graphics_btn_add_slide')}</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <p
@@ -235,29 +239,31 @@ export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
             );
           })}
 
-          {/* Dotted Card: Add New Graphic Slide */}
-          <div
-            id="card-add-new-graphic-slide"
-            onClick={handleAddSlideClick}
-            className={`group cursor-pointer rounded-2xl border-2 border-dashed p-6 flex flex-col items-center justify-center text-center transition-all duration-300 hover:scale-[1.02] min-h-[280px] select-none ${
-              isDark
-                ? 'border-slate-800 hover:border-amber-500/60 bg-slate-900/40 hover:bg-amber-500/5'
-                : 'border-slate-300 hover:border-amber-500/60 bg-slate-50 hover:bg-amber-500/5'
-            }`}
-          >
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-slate-950 transition-all shadow-lg shadow-amber-500/10">
-              <Plus className="w-7 h-7" />
+          {/* Dotted Card: Add New Graphic Slide - ONLY FOR ADMIN */}
+          {isAdmin && (
+            <div
+              id="card-add-new-graphic-slide"
+              onClick={handleAddSlideClick}
+              className={`group cursor-pointer rounded-2xl border-2 border-dashed p-6 flex flex-col items-center justify-center text-center transition-all duration-300 hover:scale-[1.02] min-h-[280px] select-none ${
+                isDark
+                  ? 'border-slate-800 hover:border-amber-500/60 bg-slate-900/40 hover:bg-amber-500/5'
+                  : 'border-slate-300 hover:border-amber-500/60 bg-slate-50 hover:bg-amber-500/5'
+              }`}
+            >
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-slate-950 transition-all shadow-lg shadow-amber-500/10">
+                <Plus className="w-7 h-7" />
+              </div>
+              <h3 className={`font-display font-bold text-base mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                + নতুন গ্রাফিক ডিজাইন যোগ করুন
+              </h3>
+              <p className="text-xs text-slate-400 max-w-xs mb-3">
+                ক্লিক করে যেকোনো পোস্টার বা আর্টওয়ার্ক ইমেজ স্লাইড আপলোড করুন
+              </p>
+              <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 group-hover:bg-amber-500 group-hover:text-slate-950 transition-all">
+                + Add Design Slide
+              </span>
             </div>
-            <h3 className={`font-display font-bold text-base mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              + নতুন গ্রাফিক ডিজাইন যোগ করুন
-            </h3>
-            <p className="text-xs text-slate-400 max-w-xs mb-3">
-              ক্লিক করে যেকোনো পোস্টার বা আর্টওয়ার্ক ইমেজ স্লাইড আপলোড করুন
-            </p>
-            <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 group-hover:bg-amber-500 group-hover:text-slate-950 transition-all">
-              + Add Design Slide
-            </span>
-          </div>
+          )}
         </div>
 
         {/* ========================================================= */}
