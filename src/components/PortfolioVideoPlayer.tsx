@@ -148,7 +148,7 @@ export const PortfolioVideoPlayer: React.FC<PortfolioVideoPlayerProps> = ({
         onLoad={handleThumbLoad}
         onError={handleThumbError}
         loading="lazy"
-        className="w-full h-full object-cover transition-transform duration-500 group-hover/player:scale-105"
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover/player:scale-105"
         style={{
           imageRendering: 'auto',
         }}
@@ -171,7 +171,7 @@ export const PortfolioVideoPlayer: React.FC<PortfolioVideoPlayerProps> = ({
       </div>
 
       {/* Centered High-Definition Cinematic Play Button */}
-      <div className="relative z-10 flex flex-col items-center gap-2 group-hover/player:scale-110 transition-transform duration-300">
+      <div className="relative z-10 flex flex-col items-center justify-center text-center gap-2 group-hover/player:scale-110 transition-transform duration-300 pointer-events-none">
         <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-600/95 group-hover/player:bg-red-600 text-white flex items-center justify-center shadow-2xl shadow-red-600/50 border-2 border-white/40 backdrop-blur-sm transition-all duration-300">
           <Play className="w-6 h-6 sm:w-7 sm:h-7 fill-white ml-0.5" />
         </div>

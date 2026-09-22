@@ -47,3 +47,10 @@ export interface PortfolioDataState {
 }
 
 export type ThemeMode = 'dark' | 'light';
+
+export type Language = 'bn' | 'en';
+
+export interface AdminSecuritySettings {
+  isConfigured: boolean;
+  lastLogin?: string;
+}

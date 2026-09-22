@@ -1,16 +1,32 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { PortfolioDataState, VideoItem, GraphicItem, PersonalInfo } from '../types';
+import { PortfolioDataState, VideoItem, GraphicItem, PersonalInfo, Language } from '../types';
 import { PERSONAL_INFO, FEATURED_VIDEO, PORTFOLIO_VIDEOS, GRAPHIC_ITEMS } from '../portfolioData';
 import { getItem, setItem, clearAll, extractYouTubeId } from '../utils/mediaStorage';
+import { t as translate, TranslationKey } from '../utils/translations';
 
 interface PortfolioContextType {
   data: PortfolioDataState;
   isLoaded: boolean;
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  toggleLanguage: () => void;
+  t: (key: TranslationKey) => string;
   lastSavedTime: string | null;
   activeEditModal: 'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' | null;
   activeEditingItemId?: string;
   openEditModal: (section?: 'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio', itemId?: string) => void;
   closeEditModal: () => void;
+  isAdmin: boolean;
+  hasCustomPassword: boolean;
+  loginAdmin: (password: string) => boolean;
+  logoutAdmin: () => void;
+  changeAdminPassword: (oldPass: string, newPass: string, forceAdminOverride?: boolean) => { success: boolean; message: string };
+  setCustomPasswordDirectly: (newPass: string) => { success: boolean; message: string };
+  showAdminLoginModal: boolean;
+  setShowAdminLoginModal: (show: boolean) => void;
+  showAdminDashboard: boolean;
+  setShowAdminDashboard: (show: boolean) => void;
+  openAdminDashboard: () => void;
   updateProfilePic: (newImageSrc: string) => Promise<void>;
   updateFeaturedVideo: (video: Partial<VideoItem>) => Promise<void>;
   updatePortfolioVideo: (id: string, updates: Partial<VideoItem>) => Promise<void>;
@@ -45,6 +61,151 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [activeEditModal, setActiveEditModal] = useState<'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' | null>(null);
   const [activeEditingItemId, setActiveEditingItemId] = useState<string | undefined>(undefined);
+
+  // Admin authentication & control state
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    return localStorage.getItem('sohan_admin_authenticated') === 'true';
+  });
+  const [hasCustomPassword, setHasCustomPassword] = useState<boolean>(() => {
+    return localStorage.getItem('sohan_admin_is_custom') === 'true';
+  });
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const [pendingEditAction, setPendingEditAction] = useState<{
+    section?: 'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio';
+    itemId?: string;
+  } | null>(null);
+
+  // Multi-Language state: supports 'bn' (বাংলা) and 'en' (English)
+  const [language, setLanguageState] = useState<Language>(() => {
+    const saved = localStorage.getItem('sohan_portfolio_lang');
+    return saved === 'en' || saved === 'bn' ? saved : 'bn';
+  });
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem('sohan_portfolio_lang', lang);
+  };
+
+  const toggleLanguage = () => {
+    setLanguage(language === 'bn' ? 'en' : 'bn');
+  };
+
+  const t = (key: TranslationKey): string => {
+    return translate(language, key);
+  };
+
+  // Listen to #admin hash navigation
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === '#admin') {
+        if (isAdmin) {
+          setShowAdminDashboard(true);
+        } else {
+          setShowAdminLoginModal(true);
+        }
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, [isAdmin]);
+
+  const loginAdmin = (password: string): boolean => {
+    const isCustom = localStorage.getItem('sohan_admin_is_custom') === 'true';
+    const stored = localStorage.getItem('sohan_admin_pwd');
+    const trimmed = password.trim();
+
+    let isValid = false;
+    if (isCustom && stored) {
+      // STRICT PRIVACY: Once Sohan sets his custom password, ONLY that exact password works!
+      // No backdoor, no default password can ever enter.
+      isValid = trimmed === stored.trim();
+    } else {
+      // Initial state before user has customized their password:
+      const initialDefault = (stored && stored.trim()) || 'sohan123';
+      isValid = trimmed === initialDefault;
+    }
+
+    if (isValid) {
+      setIsAdmin(true);
+      localStorage.setItem('sohan_admin_authenticated', 'true');
+      setShowAdminLoginModal(false);
+      
+      if (pendingEditAction) {
+        setActiveEditModal(pendingEditAction.section || 'all');
+        setActiveEditingItemId(pendingEditAction.itemId);
+        setPendingEditAction(null);
+      } else {
+        setShowAdminDashboard(true);
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const logoutAdmin = () => {
+    setIsAdmin(false);
+    localStorage.removeItem('sohan_admin_authenticated');
+    setShowAdminDashboard(false);
+    setActiveEditModal(null);
+    if (window.location.hash === '#admin') {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  };
+
+  const changeAdminPassword = (
+    oldPass: string,
+    newPass: string,
+    forceAdminOverride = false
+  ): { success: boolean; message: string } => {
+    const isCustom = localStorage.getItem('sohan_admin_is_custom') === 'true';
+    const currentStored = localStorage.getItem('sohan_admin_pwd') || 'sohan123';
+
+    if (!forceAdminOverride) {
+      if (oldPass.trim() !== currentStored.trim()) {
+        return {
+          success: false,
+          message: language === 'bn' 
+            ? 'বর্তমান পাসওয়ার্ডটি সঠিক নয়! দয়া করে আপনার সঠিক পূর্ববর্তী পাসওয়ার্ড দিন।' 
+            : 'Current password is incorrect! Please enter your valid current password.'
+        };
+      }
+    }
+
+    if (!newPass || newPass.trim().length < 4) {
+      return {
+        success: false,
+        message: language === 'bn'
+          ? 'নতুন পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে।'
+          : 'New password must be at least 4 characters.'
+      };
+    }
+
+    const trimmedNew = newPass.trim();
+    localStorage.setItem('sohan_admin_pwd', trimmedNew);
+    localStorage.setItem('sohan_admin_is_custom', 'true');
+    setHasCustomPassword(true);
+
+    return {
+      success: true,
+      message: language === 'bn'
+        ? 'আপনার নিজস্ব গোপন পাসওয়ার্ড সফলভাবে সেভ করা হয়েছে! এখন থেকে শুধুমাত্র এই নতুন পাসওয়ার্ড দিয়েই অ্যাডমিন পোর্টাল খোলা যাবে।'
+        : 'Your private custom password has been saved! From now on, only this password can unlock the admin portal.'
+    };
+  };
+
+  const setCustomPasswordDirectly = (newPass: string): { success: boolean; message: string } => {
+    return changeAdminPassword('', newPass, true);
+  };
+
+  const openAdminDashboard = () => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+    } else {
+      setShowAdminDashboard(true);
+    }
+  };
 
   // Load from IndexedDB or Server API on startup
   useEffect(() => {
@@ -148,6 +309,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const openEditModal = (section: 'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' = 'all', itemId?: string) => {
+    if (!isAdmin) {
+      setPendingEditAction({ section, itemId });
+      setShowAdminLoginModal(true);
+      return;
+    }
     setActiveEditModal(section);
     setActiveEditingItemId(itemId);
   };
@@ -647,10 +813,25 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       value={{
         data,
         isLoaded,
+        language,
+        setLanguage,
+        toggleLanguage,
+        t,
         activeEditModal,
         activeEditingItemId,
         openEditModal,
         closeEditModal,
+        isAdmin,
+        hasCustomPassword,
+        loginAdmin,
+        logoutAdmin,
+        changeAdminPassword,
+        setCustomPasswordDirectly,
+        showAdminLoginModal,
+        setShowAdminLoginModal,
+        showAdminDashboard,
+        setShowAdminDashboard,
+        openAdminDashboard,
         updateProfilePic,
         updateFeaturedVideo,
         updatePortfolioVideo,

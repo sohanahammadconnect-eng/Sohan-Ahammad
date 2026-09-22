@@ -36,6 +36,11 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ theme }) => {
     updatePortfolioVideo,
     deletePortfolioVideo,
     reorderPortfolioVideo,
+    isAdmin,
+    setShowAdminLoginModal,
+    setShowAdminDashboard,
+    t,
+    language,
   } = usePortfolio();
   const videos = data.portfolioVideos;
   const youtubeChannelUrl = data.personalInfo.youtubeChannelUrl || 'https://www.youtube.com';
@@ -55,6 +60,10 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ theme }) => {
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   const handleAddNewSlide = async () => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     const newId = await addPortfolioVideo();
     setToastMessage('নতুন ভিডিও স্লাইড সফলভাবে যোগ করা হয়েছে!');
     setTimeout(() => setToastMessage(null), 3000);
@@ -64,6 +73,10 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ theme }) => {
   };
 
   const handleToggleQuickLink = (video: VideoItem) => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     if (activeLinkId === video.id) {
       setActiveLinkId(null);
       setLinkInputVal('');
@@ -161,7 +174,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ theme }) => {
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-500 mb-2">
               <Film className="w-4 h-4" />
-              <span>Selected Works</span>
+              <span>{t('videos_badge_selected')}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
               <h2
@@ -170,21 +183,21 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ theme }) => {
                   isDark ? 'text-white' : 'text-slate-900'
                 }`}
               >
-                Video Portfolio
+                {t('videos_title')}
               </h2>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold border border-amber-500/20">
-                {videos.length} Videos
+                {videos.length} {language === 'bn' ? 'টি ভিডিও' : 'Videos'}
               </span>
               <button
                 onClick={handleAddNewSlide}
                 className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center gap-1.5 shadow cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Add Video Slide</span>
+                <span>{t('videos_btn_add_slide')}</span>
               </button>
               <button
                 onClick={() => openEditModal('videos')}
-                title="Change or update video links"
+                title={t('videos_btn_change')}
                 className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
                   isDark
                     ? 'bg-slate-900 border-slate-700 text-amber-400 hover:bg-slate-800'
@@ -192,7 +205,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ theme }) => {
                 }`}
               >
                 <Edit3 className="w-3 h-3" />
-                <span>ভিডিও পরিবর্তন করুন</span>
+                <span>{t('videos_btn_change')}</span>
               </button>
             </div>
           </div>
@@ -201,7 +214,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ theme }) => {
               isDark ? 'text-slate-400' : 'text-slate-600'
             }`}
           >
-            Narrative edits, commercial cuts, and rhythm-synchronized visual storytelling.
+            {t('videos_subtitle')}
           </p>
         </div>
 
@@ -517,10 +530,10 @@ export const VideoGrid: React.FC<VideoGridProps> = ({ theme }) => {
             </div>
             <div>
               <h4 className="font-display font-bold text-base text-current">
-                + Add Another Video Slide
+                {language === 'bn' ? '+ নতুন ভিডিও স্লাইড যোগ করুন' : '+ Add Another Video Slide'}
               </h4>
               <p className="text-xs opacity-75 mt-1">
-                আরও ভিডিও স্লাইড যোগ করতে ক্লিক করুন
+                {language === 'bn' ? 'আরও ভিডিও স্লাইড যোগ করতে এখানে ক্লিক করুন' : 'Click here to add more video slides'}
               </p>
             </div>
           </button>
