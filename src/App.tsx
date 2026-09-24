@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { PortfolioProvider } from './context/PortfolioContext';
+import { PortfolioProvider, usePortfolio } from './context/PortfolioContext';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { VideoGrid } from './components/VideoGrid';
@@ -14,13 +14,17 @@ import { MediaCustomizerModal } from './components/MediaCustomizerModal';
 import { AdminBar } from './components/AdminBar';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
+import { MobileSimulatorModal } from './components/MobileSimulatorModal';
+import { Smartphone } from 'lucide-react';
 import { ThemeMode } from './types';
 
 function PortfolioMain() {
+  const { isAdmin } = usePortfolio();
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('sohan_theme_mode');
     return (saved as ThemeMode) || 'dark';
   });
+  const [showMobileSimulator, setShowMobileSimulator] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('sohan_theme_mode', theme);
@@ -49,7 +53,11 @@ function PortfolioMain() {
       <AdminBar />
 
       {/* Top Navigation */}
-      <Navbar theme={theme} onToggleTheme={toggleTheme} />
+      <Navbar
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onOpenMobileSimulator={() => setShowMobileSimulator(true)}
+      />
 
       {/* Main Page Content */}
       <main className="relative">
@@ -74,6 +82,30 @@ function PortfolioMain() {
 
       {/* Full-Featured Admin Control Center Dashboard */}
       <AdminDashboardModal />
+
+      {/* Floating Interactive Mobile Phone Simulator Toggle (Admin only) */}
+      {isAdmin && (
+        <div className="fixed bottom-5 left-5 z-30">
+          <button
+            type="button"
+            onClick={() => setShowMobileSimulator(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-2xl shadow-amber-500/30 transition-all hover:scale-105 active:scale-95 border-2 border-slate-950 cursor-pointer"
+            title="মোবাইলে সাইটটি কেমন দেখাবে তা পরীক্ষা করুন"
+          >
+            <Smartphone className="w-4 h-4" />
+            <span className="hidden sm:inline">📱 মোবাইল প্রিভিউ</span>
+            <span className="sm:hidden">মোবাইল ভিউ</span>
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Device Simulator Modal */}
+      <MobileSimulatorModal
+        isOpen={showMobileSimulator}
+        onClose={() => setShowMobileSimulator(false)}
+        currentTheme={theme}
+        onToggleTheme={toggleTheme}
+      />
     </div>
   );
 }

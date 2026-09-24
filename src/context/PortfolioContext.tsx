@@ -78,10 +78,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     itemId?: string;
   } | null>(null);
 
-  // Multi-Language state: supports 'bn' (বাংলা) and 'en' (English)
+  // Multi-Language state: supports 'bn' (বাংলা) and 'en' (English) - default is 'en' (English)
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('sohan_portfolio_lang');
-    return saved === 'en' || saved === 'bn' ? saved : 'bn';
+    return saved === 'en' || saved === 'bn' ? saved : 'en';
   });
 
   const setLanguage = (lang: Language) => {
@@ -97,10 +97,22 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return translate(language, key);
   };
 
-  // Listen to #admin hash navigation
+  // Listen to /admin route, #admin hash, or ?admin query navigation
   useEffect(() => {
-    const handleHash = () => {
-      if (window.location.hash === '#admin') {
+    const handleAdminRoute = () => {
+      if (typeof window === 'undefined') return;
+      const pathname = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+
+      const isAdminUrl =
+        pathname === '/admin' ||
+        pathname.startsWith('/admin/') ||
+        hash === '#admin' ||
+        hash.startsWith('#/admin') ||
+        search.includes('admin');
+
+      if (isAdminUrl) {
         if (isAdmin) {
           setShowAdminDashboard(true);
         } else {
@@ -108,9 +120,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
     };
-    handleHash();
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
+
+    handleAdminRoute();
+    window.addEventListener('hashchange', handleAdminRoute);
+    window.addEventListener('popstate', handleAdminRoute);
+    return () => {
+      window.removeEventListener('hashchange', handleAdminRoute);
+      window.removeEventListener('popstate', handleAdminRoute);
+    };
   }, [isAdmin]);
 
   const loginAdmin = (password: string): boolean => {
@@ -258,12 +275,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const cleanProfilePic = isOldGeneratedPic ? '/profile.jpg' : (saved.profilePic || '/profile.jpg');
 
           let mergedVideos = saved.portfolioVideos && saved.portfolioVideos.length ? saved.portfolioVideos : defaultState.portfolioVideos;
-          // Ensure new slots (up to 10) are included for users with existing cached state
-          if (mergedVideos.length < defaultState.portfolioVideos.length) {
-            const existingIds = new Set(mergedVideos.map((v) => v.id));
-            const newSlots = defaultState.portfolioVideos.filter((v) => !existingIds.has(v.id));
-            mergedVideos = [...mergedVideos, ...newSlots];
-          }
+          // Purge broken / unavailable video slides
+          mergedVideos = mergedVideos.filter(
+            (v) => v.id !== 'video-8' && v.id !== 'video-9' && v.youtubeId !== 'WoTdjee21Sc'
+          );
 
           const finalState: PortfolioDataState = {
             ...defaultState,

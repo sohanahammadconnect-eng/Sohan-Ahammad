@@ -114,6 +114,16 @@ export const AdminDashboardModal: React.FC = () => {
     }
   };
 
+  const handleDownloadProfilePic = () => {
+    if (!data.profilePic) return;
+    const link = document.createElement('a');
+    link.href = data.profilePic;
+    link.download = 'profile.jpg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Copy code toast
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -165,9 +175,16 @@ export const AdminDashboardModal: React.FC = () => {
       });
 
       // 2. Fetch binary ZIP blob to ensure 100% clean archive download
-      const res = await fetch(`/api/download-zip?t=${Date.now()}`);
-      if (!res.ok) throw new Error('Failed to download ZIP file');
-      const blob = await res.blob();
+      let blob: Blob;
+      try {
+        const res = await fetch(`/api/download-zip?t=${Date.now()}`);
+        if (!res.ok) throw new Error('API route failed');
+        blob = await res.blob();
+      } catch {
+        const staticRes = await fetch(`/sohan-portfolio-latest.zip?t=${Date.now()}`);
+        if (!staticRes.ok) throw new Error('Static ZIP download failed');
+        blob = await staticRes.blob();
+      }
 
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -401,11 +418,27 @@ export const AdminDashboardModal: React.FC = () => {
     if (e.target) e.target.value = '';
   };
 
+  const handleCloseDashboard = () => {
+    setShowAdminDashboard(false);
+    if (
+      typeof window !== 'undefined' &&
+      (window.location.pathname.toLowerCase().includes('admin') ||
+        window.location.hash.toLowerCase().includes('admin') ||
+        window.location.search.toLowerCase().includes('admin'))
+    ) {
+      try {
+        window.history.replaceState(null, '', '/');
+      } catch {
+        // ignore
+      }
+    }
+  };
+
   return (
     <div
       id="admin-dashboard-modal-backdrop"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in"
-      onClick={() => setShowAdminDashboard(false)}
+      onClick={handleCloseDashboard}
     >
       <div
         id="admin-dashboard-card"
@@ -487,7 +520,7 @@ export const AdminDashboardModal: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setShowAdminDashboard(false)}
+              onClick={handleCloseDashboard}
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               title="Close"
             >
@@ -1459,7 +1492,7 @@ export const AdminDashboardModal: React.FC = () => {
                 </div>
 
                 {/* Quick Action Buttons */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <button
                     type="button"
                     onClick={handleCopyFreshLink}
@@ -1473,9 +1506,19 @@ export const AdminDashboardModal: React.FC = () => {
                     ) : (
                       <>
                         <Copy className="w-4 h-4" />
-                        <span>তাজা লিংক কপি করুন (নতুন ছবি সহ)</span>
+                        <span>তাজা লিংক কপি করুন</span>
                       </>
                     )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadProfilePic}
+                    className="p-3 rounded-xl border border-amber-500/30 bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    title="টেলিগ্রামের সার্ভারে আপলোড করার জন্য এই ছবিটি profile.jpg হিসেবে ডাউনলোড করুন"
+                  >
+                    <Download className="w-4 h-4 text-amber-400" />
+                    <span>profile.jpg ডাউনলোড</span>
                   </button>
 
                   <button
@@ -1484,7 +1527,7 @@ export const AdminDashboardModal: React.FC = () => {
                     className="p-3 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     <Camera className="w-4 h-4 text-amber-400" />
-                    <span>নতুন ছবি আপলোড করুন</span>
+                    <span>নতুন ছবি বদলান</span>
                   </button>
                 </div>
 
@@ -2137,7 +2180,7 @@ export const AdminDashboardModal: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setShowAdminDashboard(false)}
+            onClick={handleCloseDashboard}
             className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs cursor-pointer"
           >
             বন্ধ করুন (Done)

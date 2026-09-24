@@ -25,6 +25,18 @@ export const AdminLoginModal: React.FC = () => {
     setPassword('');
     setError(null);
     setSuccess(false);
+    if (
+      typeof window !== 'undefined' &&
+      (window.location.pathname.toLowerCase().includes('admin') ||
+        window.location.hash.toLowerCase().includes('admin') ||
+        window.location.search.toLowerCase().includes('admin'))
+    ) {
+      try {
+        window.history.replaceState(null, '', '/');
+      } catch {
+        // ignore
+      }
+    }
   };
 
   const executeLogin = (pass: string) => {

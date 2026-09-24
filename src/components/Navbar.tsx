@@ -1,14 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { Sun, Moon, Sparkles, Sliders, Menu, X, Video, Film, Mail, ExternalLink, Lock, ShieldCheck, LayoutDashboard, Languages, Camera, User } from 'lucide-react';
+import { Sun, Moon, Sparkles, Sliders, Menu, X, Video, Film, Mail, ExternalLink, Lock, ShieldCheck, LayoutDashboard, Languages, Camera, User, Smartphone } from 'lucide-react';
 import { ThemeMode } from '../types';
 import { usePortfolio } from '../context/PortfolioContext';
 
 interface NavbarProps {
   theme: ThemeMode;
   onToggleTheme: () => void;
+  onOpenMobileSimulator?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme }) => {
+export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme, onOpenMobileSimulator }) => {
   const isDark = theme === 'dark';
   const {
     data,
@@ -181,52 +182,37 @@ export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme }) => {
             </div>
           </button>
 
-          {/* Admin Panel Button */}
-          {isAdmin ? (
-            <button
-              id="btn-navbar-admin-dashboard"
-              type="button"
-              onClick={() => setShowAdminDashboard(true)}
-              className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer active:scale-95"
-              title={t('nav_admin_dashboard')}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{t('nav_admin_dashboard')}</span>
-              <span className="sm:hidden">Admin</span>
-            </button>
-          ) : (
-            <button
-              id="btn-navbar-admin-login"
-              type="button"
-              onClick={() => setShowAdminLoginModal(true)}
-              className={`px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                isDark
-                  ? 'border-slate-800 bg-slate-900/80 text-slate-300 hover:text-amber-400 hover:border-amber-500/40'
-                  : 'border-slate-300 bg-slate-50 text-slate-700 hover:text-amber-600 hover:border-amber-500/40'
-              }`}
-              title={t('nav_admin_login')}
-            >
-              <Lock className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden sm:inline">{t('nav_admin_login')}</span>
-              <span className="sm:hidden">Admin</span>
-            </button>
-          )}
+          {/* Admin Dashboard & Customize Buttons (Only visible when authenticated as Admin via /admin) */}
+          {isAdmin && (
+            <>
+              <button
+                id="btn-navbar-admin-dashboard"
+                type="button"
+                onClick={() => setShowAdminDashboard(true)}
+                className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer active:scale-95"
+                title={t('nav_admin_dashboard')}
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{t('nav_admin_dashboard')}</span>
+                <span className="sm:hidden">Admin</span>
+              </button>
 
-          {/* Quick Edit / Customize Button */}
-          <button
-            id="btn-edit-portfolio"
-            type="button"
-            onClick={() => openEditModal('all')}
-            title={t('nav_customize')}
-            className={`px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              isDark
-                ? 'border-slate-800 bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800'
-                : 'border-slate-300 bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5 text-amber-500" />
-            <span className="hidden md:inline">{t('nav_customize')}</span>
-          </button>
+              <button
+                id="btn-edit-portfolio"
+                type="button"
+                onClick={() => openEditModal('all')}
+                title={t('nav_customize')}
+                className={`px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isDark
+                    ? 'border-slate-800 bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'border-slate-300 bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden md:inline">{t('nav_customize')}</span>
+              </button>
+            </>
+          )}
 
           {/* Theme Toggle Button */}
           <button
@@ -326,8 +312,8 @@ export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme }) => {
             {t('nav_about')}
           </a>
 
-          <div className="pt-2 border-t border-slate-800">
-            {isAdmin ? (
+          {isAdmin && (
+            <div className="pt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => {
@@ -339,20 +325,8 @@ export const Navbar: React.FC<NavbarProps> = ({ theme, onToggleTheme }) => {
                 <LayoutDashboard className="w-4 h-4" />
                 <span>{t('nav_admin_dashboard')}</span>
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setShowAdminLoginModal(true);
-                }}
-                className="w-full py-2.5 px-3 rounded-xl border border-slate-700 bg-slate-900 text-amber-400 font-semibold text-xs flex items-center justify-center gap-2"
-              >
-                <Lock className="w-4 h-4 text-amber-500" />
-                <span>{t('nav_admin_login')}</span>
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </header>

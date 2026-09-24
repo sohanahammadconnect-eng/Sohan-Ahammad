@@ -105,22 +105,6 @@ export const PORTFOLIO_VIDEOS: VideoItem[] = [
     "videoSourceType": "youtube"
   },
   {
-    "id": "video-8",
-    "youtubeId": "WoTdjee21Sc",
-    "title": "Event Highlights & Aftermovie Cut",
-    "category": "Event Highlight",
-    "description": "Capturing electric atmosphere and emotional moments with synchronized musical crescendos.",
-    "videoSourceType": "youtube"
-  },
-  {
-    "id": "video-9",
-    "youtubeId": "WoTdjee21Sc",
-    "title": "Motion Graphics & VFX Visuals",
-    "category": "Motion & VFX",
-    "description": "Seamless integration of title animation, graphic overlays, and cinematic VFX polish.",
-    "videoSourceType": "youtube"
-  },
-  {
     "id": "video-10",
     "youtubeId": "VB354UjXkNw",
     "title": "Mini-Documentary & Interview Spotlight",
