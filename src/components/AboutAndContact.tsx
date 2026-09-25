@@ -36,20 +36,6 @@ export const AboutAndContact: React.FC<AboutAndContactProps> = ({ theme }) => {
                 {t('about_title')}
               </h2>
             </div>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => openEditModal('bio')}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer ${
-                  isDark
-                    ? 'bg-slate-900 border-slate-700 text-amber-400 hover:bg-slate-800'
-                    : 'bg-white border-slate-300 text-amber-600 hover:bg-slate-100'
-                }`}
-              >
-                <Edit3 className="w-3 h-3" />
-                <span>{t('about_btn_edit_bio')}</span>
-              </button>
-            )}
           </div>
 
           <div

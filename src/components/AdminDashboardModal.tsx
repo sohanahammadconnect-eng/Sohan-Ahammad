@@ -419,19 +419,7 @@ export const AdminDashboardModal: React.FC = () => {
   };
 
   const handleCloseDashboard = () => {
-    setShowAdminDashboard(false);
-    if (
-      typeof window !== 'undefined' &&
-      (window.location.pathname.toLowerCase().includes('admin') ||
-        window.location.hash.toLowerCase().includes('admin') ||
-        window.location.search.toLowerCase().includes('admin'))
-    ) {
-      try {
-        window.history.replaceState(null, '', '/');
-      } catch {
-        // ignore
-      }
-    }
+    logoutAdmin();
   };
 
   return (
@@ -1410,14 +1398,29 @@ export const AdminDashboardModal: React.FC = () => {
                   <p className="text-xs text-slate-400 mb-3">
                     ওয়েবসাইটের শীর্ষের মূল ইমেজ পরিবর্তন করতে এখানে ছবি আপলোড করুন।
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => profilePhotoInputRef.current?.click()}
-                    className="px-4 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-amber-400 flex items-center gap-1.5 mx-auto sm:mx-0 cursor-pointer"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>ছবি নির্বাচন করুন</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                    <button
+                      type="button"
+                      onClick={() => profilePhotoInputRef.current?.click()}
+                      className="px-4 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-amber-400 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>নতুন ছবি আপলোড করুন</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await updateProfilePic('/profile.jpg');
+                        setProfileSuccess(true);
+                        setTimeout(() => setProfileSuccess(false), 3000);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl border border-slate-700/80 bg-slate-900/90 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer"
+                      title="অরিজিনাল ছবি (/profile.jpg) পুনরুদ্ধার করুন"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                      <span>অরিজিনাল ছবি রিসেট</span>
+                    </button>
+                  </div>
                   {profileSuccess && (
                     <span className="text-xs text-emerald-400 font-semibold block mt-1.5">
                       ✓ প্রোফাইল ছবি আপডেট হয়েছে!

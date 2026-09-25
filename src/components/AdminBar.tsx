@@ -66,15 +66,6 @@ export const AdminBar: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => openEditModal('all')}
-            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold flex items-center gap-1 transition-all cursor-pointer text-[11px]"
-          >
-            <Settings className="w-3 h-3 text-amber-400" />
-            <span className="hidden sm:inline">{t('admin_bar_customize')}</span>
-          </button>
-
-          <button
-            type="button"
             onClick={logoutAdmin}
             className="px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 transition-all cursor-pointer text-[11px]"
             title={t('admin_bar_logout')}

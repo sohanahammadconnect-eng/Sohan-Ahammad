@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ExternalLink, Sparkles, Image as ImageIcon, X, ChevronLeft, ChevronRight, Edit3, Plus } from 'lucide-react';
-import { ThemeMode, GraphicItem } from '../types';
+import { ExternalLink, Sparkles, Image as ImageIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ThemeMode } from '../types';
 import { usePortfolio } from '../context/PortfolioContext';
 
 interface GraphicsGridProps {
@@ -9,14 +9,9 @@ interface GraphicsGridProps {
 
 export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
   const isDark = theme === 'dark';
-  const { data, openEditModal, addGraphicItem, isAdmin, setShowAdminLoginModal, setShowAdminDashboard, t, language } = usePortfolio();
+  const { data, t, language } = usePortfolio();
   const graphics = data.graphicItems;
   const behanceUrl = data.personalInfo.behanceUrl || 'https://www.behance.net';
-
-  // Quick Direct Graphic Upload ref
-  const quickGraphicInputRef = React.useRef<HTMLInputElement>(null);
-  const [isAddingQuick, setIsAddingQuick] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Lightbox Modal state
   const [selectedGraphicIndex, setSelectedGraphicIndex] = useState<number | null>(null);
@@ -41,40 +36,6 @@ export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
     if (selectedGraphicIndex !== null) {
       setSelectedGraphicIndex((prev) => (prev! < graphics.length - 1 ? prev! + 1 : 0));
     }
-  };
-
-  const handleAddSlideClick = () => {
-    if (!isAdmin) {
-      setShowAdminLoginModal(true);
-      return;
-    }
-    // If admin is logged in, trigger file select or open customizer
-    quickGraphicInputRef.current?.click();
-  };
-
-  const handleQuickGraphicFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsAddingQuick(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        await addGraphicItem({
-          filename: result,
-          title: `New Graphic Design ${graphics.length + 1}`,
-          subtitle: 'Custom poster & visual artwork',
-          category: 'Poster Design',
-          fitMode: 'cover',
-        });
-        setToastMessage('✅ নতুন গ্রাফিক ডিজাইন সফলভাবে যোগ করা হয়েছে!');
-        setTimeout(() => setToastMessage(null), 3500);
-      }
-      setIsAddingQuick(false);
-      if (quickGraphicInputRef.current) quickGraphicInputRef.current.value = '';
-    };
-    reader.readAsDataURL(file);
   };
 
   const activeItem = selectedGraphicIndex !== null ? graphics[selectedGraphicIndex] : null;
@@ -102,37 +63,6 @@ export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold border border-amber-500/20">
                 {graphics.length} {language === 'bn' ? 'টি ডিজাইন' : 'Designs'}
               </span>
-              {isAdmin && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isAdmin) {
-                        setShowAdminLoginModal(true);
-                      } else {
-                        setShowAdminDashboard(true);
-                      }
-                    }}
-                    className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
-                      isDark
-                        ? 'bg-slate-900 border-slate-700 text-amber-400 hover:bg-slate-800'
-                        : 'bg-white border-slate-300 text-amber-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Edit3 className="w-3 h-3" />
-                    <span>{t('graphics_btn_change')}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleAddSlideClick}
-                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer active:scale-95"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>{t('graphics_btn_add_slide')}</span>
-                  </button>
-                </>
-              )}
             </div>
           </div>
           <p
@@ -143,22 +73,6 @@ export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
             {t('graphics_subtitle')}
           </p>
         </div>
-
-        {/* Toast Message */}
-        {toastMessage && (
-          <div className="mb-6 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2 animate-fade-in">
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        {/* Hidden file input for fast quick-add */}
-        <input
-          type="file"
-          ref={quickGraphicInputRef}
-          onChange={handleQuickGraphicFile}
-          accept="image/*"
-          className="hidden"
-        />
 
         {/* Graphics Grid (2 cols sm, 3 cols lg) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -183,7 +97,6 @@ export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
                     src={imageSrc}
                     alt={item.title}
                     onError={(e) => {
-                      // Fallback placeholder with aesthetic graphic banner
                       const target = e.currentTarget;
                       target.onerror = null;
                       target.src = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80`;
@@ -238,32 +151,6 @@ export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
               </div>
             );
           })}
-
-          {/* Dotted Card: Add New Graphic Slide - ONLY FOR ADMIN */}
-          {isAdmin && (
-            <div
-              id="card-add-new-graphic-slide"
-              onClick={handleAddSlideClick}
-              className={`group cursor-pointer rounded-2xl border-2 border-dashed p-6 flex flex-col items-center justify-center text-center transition-all duration-300 hover:scale-[1.02] min-h-[280px] select-none ${
-                isDark
-                  ? 'border-slate-800 hover:border-amber-500/60 bg-slate-900/40 hover:bg-amber-500/5'
-                  : 'border-slate-300 hover:border-amber-500/60 bg-slate-50 hover:bg-amber-500/5'
-              }`}
-            >
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-slate-950 transition-all shadow-lg shadow-amber-500/10">
-                <Plus className="w-7 h-7" />
-              </div>
-              <h3 className={`font-display font-bold text-base mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                + নতুন গ্রাফিক ডিজাইন যোগ করুন
-              </h3>
-              <p className="text-xs text-slate-400 max-w-xs mb-3">
-                ক্লিক করে যেকোনো পোস্টার বা আর্টওয়ার্ক ইমেজ স্লাইড আপলোড করুন
-              </p>
-              <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 group-hover:bg-amber-500 group-hover:text-slate-950 transition-all">
-                + Add Design Slide
-              </span>
-            </div>
-          )}
         </div>
 
         {/* ========================================================= */}
@@ -275,93 +162,95 @@ export const GraphicsGrid: React.FC<GraphicsGridProps> = ({ theme }) => {
             href={behanceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="group inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl font-display font-bold text-sm sm:text-base bg-gradient-to-r from-[#0057ff] via-[#0047d9] to-[#003bb3] hover:from-[#1a68ff] hover:via-[#0057ff] hover:to-[#0047d9] text-white shadow-xl shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 hover:scale-[1.03] active:scale-95"
+            className="group inline-flex items-center gap-3 px-8 py-3.5 rounded-2xl font-display font-bold text-sm sm:text-base bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 text-white shadow-xl shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 hover:scale-[1.03] active:scale-95"
           >
-            <span className="w-6 h-6 rounded-lg bg-white text-[#0057ff] flex items-center justify-center font-black text-xs shadow-inner">
-              Bē
-            </span>
             <span>Go to Behance</span>
             <ExternalLink className="w-4 h-4 text-white/80 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </a>
 
           <p className="text-xs text-slate-400 max-w-md">
-            Click <span className="font-semibold text-blue-400">"Go to Behance"</span> to view complete high-resolution design case studies and portfolios.
+            Click <span className="font-semibold text-blue-400">&quot;Go to Behance&quot;</span> to browse high-resolution graphic design portfolios and case studies.
           </p>
         </div>
 
       </div>
 
-      {/* LIGHTBOX MODAL */}
-      {selectedGraphicIndex !== null && activeItem && (
+      {/* Lightbox / HD Artwork Preview Modal */}
+      {activeItem && selectedGraphicIndex !== null && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 sm:p-8 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fade-in"
           onClick={handleCloseLightbox}
         >
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={handleCloseLightbox}
-            className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
-            title="Close"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          {/* Left Arrow */}
-          <button
-            type="button"
-            onClick={handlePrev}
-            className="absolute left-3 sm:left-6 z-50 p-3 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all cursor-pointer"
-            title="Previous"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-
-          {/* Right Arrow */}
-          <button
-            type="button"
-            onClick={handleNext}
-            className="absolute right-3 sm:right-6 z-50 p-3 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all cursor-pointer"
-            title="Next"
-          >
-            <ChevronRight className="w-6 h-6" />
-          </button>
-
-          {/* Image & Caption */}
           <div
-            className="max-w-4xl max-h-[85vh] flex flex-col items-center"
+            className="relative max-w-4xl w-full max-h-[90vh] bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <img
-              src={
-                activeItem.filename.startsWith('data:') || activeItem.filename.startsWith('blob:') || activeItem.filename.startsWith('http')
-                  ? activeItem.filename
-                  : `/${activeItem.filename}`
-              }
-              alt={activeItem.title}
-              onError={(e) => {
-                const target = e.currentTarget;
-                target.onerror = null;
-                target.src = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=85`;
-              }}
-              className="max-w-full max-h-[72vh] object-contain rounded-xl shadow-2xl border border-white/10"
-            />
+            {/* Header */}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-amber-500 tracking-wider">
+                  {activeItem.category} • {selectedGraphicIndex + 1} of {graphics.length}
+                </span>
+                <h3 className="font-display font-bold text-lg text-white">
+                  {activeItem.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseLightbox}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <div className="mt-4 text-center text-white">
-              <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 px-3 py-0.5 rounded-full border border-amber-500/30 inline-block mb-1.5">
-                {activeItem.category}
-              </span>
-              <h3 className="font-display font-bold text-xl sm:text-2xl text-white">
-                {activeItem.title}
-              </h3>
-              {activeItem.subtitle && (
-                <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
-                  {activeItem.subtitle}
-                </p>
+            {/* Main Preview Container */}
+            <div className="relative flex-1 bg-black flex items-center justify-center p-2 min-h-[300px] max-h-[65vh]">
+              <img
+                src={
+                  activeItem.filename && (activeItem.filename.startsWith('data:') || activeItem.filename.startsWith('blob:') || activeItem.filename.startsWith('http'))
+                    ? activeItem.filename
+                    : `/${activeItem.filename}`
+                }
+                alt={activeItem.title}
+                className="max-h-full max-w-full object-contain"
+              />
+
+              {/* Prev / Next controls */}
+              {graphics.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handlePrev}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-slate-900/80 hover:bg-amber-500 hover:text-slate-950 text-white transition-colors shadow-lg cursor-pointer"
+                    title="Previous Design"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-slate-900/80 hover:bg-amber-500 hover:text-slate-950 text-white transition-colors shadow-lg cursor-pointer"
+                    title="Next Design"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
               )}
-              <p className="text-[11px] text-slate-500 mt-2">
-                Item {selectedGraphicIndex + 1} of {graphics.length}
-              </p>
+            </div>
+
+            {/* Footer / Subtitle */}
+            <div className="p-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+              <span>{activeItem.subtitle || 'Custom Visual Art'}</span>
+              <a
+                href={behanceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-amber-400 hover:underline flex items-center gap-1 font-semibold"
+              >
+                <span>View on Behance</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
           </div>
         </div>

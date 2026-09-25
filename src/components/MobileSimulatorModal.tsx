@@ -324,7 +324,7 @@ export const MobileSimulatorModal: React.FC<MobileSimulatorModalProps> = ({
                                 {v.title}
                               </h5>
                               <span className="text-[9px] text-slate-400 flex items-center gap-1">
-                                <span>{v.client}</span>
+                                <span>{v.category}</span>
                               </span>
                             </div>
                           </div>
@@ -342,10 +342,14 @@ export const MobileSimulatorModal: React.FC<MobileSimulatorModalProps> = ({
                         <span className="text-[9px] text-slate-400 font-mono">Posters & Covers</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        {data.graphics.slice(0, 2).map((g) => (
+                        {(data.graphicItems || []).slice(0, 2).map((g) => (
                           <div key={g.id} className="rounded-lg overflow-hidden bg-slate-900 border border-slate-800">
                             <div className="aspect-[3/4] bg-slate-800">
-                              <img src={g.imageUrl} alt={g.title} className="w-full h-full object-cover" />
+                              <img
+                                src={g.filename && (g.filename.startsWith('http') || g.filename.startsWith('data:')) ? g.filename : `/${g.filename}`}
+                                alt={g.title}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
                             <div className="p-1.5">
                               <p className="text-[10px] font-semibold text-white truncate">{g.title}</p>
@@ -364,22 +368,24 @@ export const MobileSimulatorModal: React.FC<MobileSimulatorModalProps> = ({
                         {data.personalInfo.email || 'sohanahammad.connect@gmail.com'}
                       </p>
                       <div className="flex items-center justify-center gap-2">
-                        <a
-                          href={`https://wa.me/${(data.socialLinks.whatsapp || '').replace(/[^0-9]/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold"
-                        >
-                          WhatsApp
-                        </a>
-                        <a
-                          href={`https://t.me/${(data.socialLinks.telegram || '').replace('@', '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1 rounded-lg bg-sky-600 text-white text-[10px] font-bold"
-                        >
-                          Telegram
-                        </a>
+                        {data.personalInfo.whatsappUrl && (
+                          <a
+                            href={data.personalInfo.whatsappUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold"
+                          >
+                            WhatsApp
+                          </a>
+                        )}
+                        {data.personalInfo.email && (
+                          <a
+                            href={`mailto:${data.personalInfo.email}`}
+                            className="px-3 py-1 rounded-lg bg-amber-600 text-white text-[10px] font-bold"
+                          >
+                            Email
+                          </a>
+                        )}
                       </div>
                     </div>
 

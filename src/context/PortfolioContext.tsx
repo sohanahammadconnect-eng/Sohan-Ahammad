@@ -48,7 +48,7 @@ interface PortfolioContextType {
 const STORAGE_KEY = 'sohan_portfolio_data_v1';
 
 const defaultState: PortfolioDataState = {
-  profilePic: '',
+  profilePic: '/profile.jpg',
   personalInfo: PERSONAL_INFO,
   featuredVideo: FEATURED_VIDEO,
   portfolioVideos: PORTFOLIO_VIDEOS,
@@ -64,10 +64,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [activeEditModal, setActiveEditModal] = useState<'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' | null>(null);
   const [activeEditingItemId, setActiveEditingItemId] = useState<string | undefined>(undefined);
 
-  // Admin authentication & control state
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    return localStorage.getItem('sohan_admin_authenticated') === 'true';
-  });
+  // Admin authentication & control state - strictly session-only (never permanently persisted)
+  // This guarantees that leaving or re-entering /admin always requires the password @@2005
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [hasCustomPassword, setHasCustomPassword] = useState<boolean>(() => {
     return localStorage.getItem('sohan_admin_is_custom') === 'true';
   });
@@ -124,9 +123,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     handleAdminRoute();
     window.addEventListener('hashchange', handleAdminRoute);
     window.addEventListener('popstate', handleAdminRoute);
+    const intervalId = setInterval(handleAdminRoute, 400);
+
     return () => {
       window.removeEventListener('hashchange', handleAdminRoute);
       window.removeEventListener('popstate', handleAdminRoute);
+      clearInterval(intervalId);
     };
   }, [isAdmin]);
 
@@ -134,15 +136,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const stored = localStorage.getItem('sohan_admin_pwd');
     const trimmed = password.trim();
 
-    // 1. 'sohan123' (case-insensitive) always works as the master owner key
+    // 1. '@@2005' works as the master owner key (user specified)
     // 2. Any custom password saved in localStorage also works
-    const isMasterDefault = trimmed.toLowerCase() === 'sohan123';
-    const isCustomMatch = stored ? (trimmed === stored.trim() || trimmed.toLowerCase() === stored.trim().toLowerCase()) : false;
+    const isMasterDefault = trimmed === '@@2005';
+    const isCustomMatch = stored ? trimmed === stored.trim() : false;
     const isValid = isMasterDefault || isCustomMatch;
 
     if (isValid) {
       setIsAdmin(true);
-      localStorage.setItem('sohan_admin_authenticated', 'true');
+      // Strictly do not persist authenticated state in localStorage
+      // So once the user exits the panel, it asks for the password again every time
+      localStorage.removeItem('sohan_admin_authenticated');
       setShowAdminLoginModal(false);
       
       if (pendingEditAction) {
@@ -159,7 +163,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const resetAdminPasswordToDefault = () => {
     localStorage.removeItem('sohan_admin_is_custom');
-    localStorage.removeItem('sohan_admin_pwd');
+    localStorage.setItem('sohan_admin_pwd', '@@2005');
     setHasCustomPassword(false);
   };
 
@@ -167,9 +171,23 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsAdmin(false);
     localStorage.removeItem('sohan_admin_authenticated');
     setShowAdminDashboard(false);
+    setShowAdminLoginModal(false);
     setActiveEditModal(null);
-    if (window.location.hash === '#admin') {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (typeof window !== 'undefined') {
+      try {
+        const pathname = window.location.pathname.toLowerCase();
+        const hash = window.location.hash.toLowerCase();
+        const search = window.location.search.toLowerCase();
+        if (
+          pathname.includes('admin') ||
+          hash.includes('admin') ||
+          search.includes('admin')
+        ) {
+          window.history.replaceState(null, '', '/');
+        }
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -179,7 +197,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     forceAdminOverride = false
   ): { success: boolean; message: string } => {
     const isCustom = localStorage.getItem('sohan_admin_is_custom') === 'true';
-    const currentStored = localStorage.getItem('sohan_admin_pwd') || 'sohan123';
+    const currentStored = localStorage.getItem('sohan_admin_pwd') || '@@2005';
 
     if (!forceAdminOverride) {
       if (oldPass.trim() !== currentStored.trim()) {
@@ -365,11 +383,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updateProfilePic = async (newImageSrc: string) => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     const next = { ...data, profilePic: newImageSrc };
     await persist(next);
   };
 
   const updateFeaturedVideo = async (videoUpdates: Partial<VideoItem>) => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     const cleaned = { ...videoUpdates };
     if (cleaned.youtubeId) {
       cleaned.youtubeId = extractYouTubeId(cleaned.youtubeId);
@@ -382,6 +408,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updatePortfolioVideo = async (id: string, updates: Partial<VideoItem>) => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     const cleaned = { ...updates };
     if (cleaned.youtubeId) {
       cleaned.youtubeId = extractYouTubeId(cleaned.youtubeId);
@@ -394,6 +424,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const addPortfolioVideo = async (newVideo?: Partial<VideoItem>): Promise<string> => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      throw new Error('Unauthorized: Admin access required');
+    }
     const newId = 'video-' + Date.now();
     const item: VideoItem = {
       id: newId,
@@ -412,6 +446,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const deletePortfolioVideo = async (id: string) => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     if (data.portfolioVideos.length <= 1) {
       alert('কমপক্ষে একটি ভিডিও স্লাইড থাকতে হবে।');
       return;
@@ -421,6 +459,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const reorderPortfolioVideo = async (id: string, direction: 'prev' | 'next') => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     const index = data.portfolioVideos.findIndex((v) => v.id === id);
     if (index === -1) return;
     const targetIndex = direction === 'prev' ? index - 1 : index + 1;
@@ -434,6 +476,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updateGraphicItem = async (id: string, updates: Partial<GraphicItem>) => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     const nextGraphics = data.graphicItems.map((g) =>
       g.id === id ? { ...g, ...updates } : g
     );
@@ -442,6 +488,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const addGraphicItem = async (newItem?: Partial<GraphicItem>): Promise<string> => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      throw new Error('Unauthorized: Admin access required');
+    }
     const newId = 'graphic-' + Date.now();
     const item: GraphicItem = {
       id: newId,
@@ -457,6 +507,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const deleteGraphicItem = async (id: string) => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     if (data.graphicItems.length <= 1) {
       alert('কমপক্ষে একটি ডিজাইন স্লাইড থাকতে হবে।');
       return;
@@ -466,6 +520,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const reorderGraphicItem = async (id: string, direction: 'prev' | 'next') => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     const index = data.graphicItems.findIndex((g) => g.id === id);
     if (index === -1) return;
     const targetIndex = direction === 'prev' ? index - 1 : index + 1;
@@ -479,6 +537,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updatePersonalInfo = async (updates: Partial<PersonalInfo>) => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     const next = {
       ...data,
       personalInfo: { ...data.personalInfo, ...updates },
@@ -487,11 +549,19 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const resetToDefaults = async () => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return;
+    }
     await clearAll();
     setData(defaultState);
   };
 
   const importBackupData = async (backupData: any): Promise<boolean> => {
+    if (!isAdmin) {
+      setShowAdminLoginModal(true);
+      return false;
+    }
     try {
       if (!backupData || typeof backupData !== 'object') return false;
       const next: PortfolioDataState = {
