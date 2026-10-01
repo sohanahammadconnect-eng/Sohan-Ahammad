@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { PortfolioDataState, VideoItem, GraphicItem, PersonalInfo, Language } from '../types';
 import { PERSONAL_INFO, FEATURED_VIDEO, PORTFOLIO_VIDEOS, GRAPHIC_ITEMS } from '../portfolioData';
 import { getItem, setItem, clearAll, extractYouTubeId } from '../utils/mediaStorage';
@@ -45,8 +45,16 @@ interface PortfolioContextType {
   generateCustomHtml: () => string;
 }
 
+const STORAGE_KEY_V1 = 'sohan_portfolio_data_v1';
 const STORAGE_KEY = 'sohan_portfolio_data_v5_20260930';
+const BACKUP_KEY_V1 = 'sohan_portfolio_backup';
 const BACKUP_KEY = 'sohan_portfolio_backup_v5_20260930';
+const CODE_SIGNATURE_KEY = 'sohan_code_videos_sig_v1';
+
+const CODE_VIDEOS_SIGNATURE =
+  (FEATURED_VIDEO?.youtubeId || '') +
+  '::' +
+  PORTFOLIO_VIDEOS.map((v) => `${v.id}:${v.youtubeId}`).join('|');
 
 const defaultState: PortfolioDataState = {
   profilePic: '/profile.jpg',
@@ -59,7 +67,14 @@ const defaultState: PortfolioDataState = {
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
 
 export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [data, setData] = useState<PortfolioDataState>(defaultState);
+  const [data, setDataState] = useState<PortfolioDataState>(defaultState);
+  const latestDataRef = useRef<PortfolioDataState>(defaultState);
+
+  const setData = (next: PortfolioDataState) => {
+    latestDataRef.current = next;
+    setDataState(next);
+  };
+
   const [isLoaded, setIsLoaded] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [activeEditModal, setActiveEditModal] = useState<'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' | null>(null);
@@ -249,16 +264,33 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     async function loadData() {
       try {
-        let saved = await getItem<PortfolioDataState>(STORAGE_KEY);
-        
-        // Fallback to localStorage backup if IndexedDB is empty
-        if (!saved) {
-          try {
-            const ls = localStorage.getItem(BACKUP_KEY);
-            if (ls) saved = JSON.parse(ls);
-          } catch {
-            // ignore
+        const isPreviewEnv =
+          typeof window !== 'undefined' &&
+          (window.location.hostname.includes('run.app') ||
+            window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1');
+
+        const prevCodeSig = localStorage.getItem(CODE_SIGNATURE_KEY);
+        const codeUpdatedOnDeploy = !isPreviewEnv && prevCodeSig !== CODE_VIDEOS_SIGNATURE;
+
+        let saved: PortfolioDataState | null = null;
+
+        if (!codeUpdatedOnDeploy) {
+          // Check v1 first in preview so user's saved video link edits in v1 are recovered
+          const savedV1 = await getItem<PortfolioDataState>(STORAGE_KEY_V1);
+          const savedV5 = await getItem<PortfolioDataState>(STORAGE_KEY);
+          saved = savedV1 || savedV5;
+
+          if (!saved) {
+            try {
+              const ls = localStorage.getItem(BACKUP_KEY_V1) || localStorage.getItem(BACKUP_KEY);
+              if (ls) saved = JSON.parse(ls);
+            } catch {
+              // ignore
+            }
           }
+        } else {
+          localStorage.setItem(CODE_SIGNATURE_KEY, CODE_VIDEOS_SIGNATURE);
         }
 
         // Fallback to server API or static saved_portfolio.json if local is empty
@@ -266,18 +298,27 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           try {
             const res = await fetch('/api/get-portfolio');
             if (res.ok) {
-              saved = await res.json();
+              const json = await res.json();
+              if (json && json.portfolioVideos) {
+                saved = json;
+              }
             } else {
               const staticRes = await fetch('/saved_portfolio.json');
               if (staticRes.ok) {
-                saved = await staticRes.json();
+                const json = await staticRes.json();
+                if (json && json.portfolioVideos) {
+                  saved = json;
+                }
               }
             }
           } catch {
             try {
               const staticRes = await fetch('/saved_portfolio.json');
               if (staticRes.ok) {
-                saved = await staticRes.json();
+                const json = await staticRes.json();
+                if (json && json.portfolioVideos) {
+                  saved = json;
+                }
               }
             } catch {
               // ignore
@@ -312,16 +353,29 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setData(finalState);
           setLastSavedTime('Loaded from saved profile');
 
-          // Auto-sync with server so src/portfolioData.ts, public/saved_portfolio.json, and the ZIP are in perfect sync
-          try {
-            fetch('/api/save-portfolio', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(finalState),
-            }).catch(() => {});
-          } catch {
-            // ignore
+          if (codeUpdatedOnDeploy) {
+            try {
+              await setItem(STORAGE_KEY_V1, finalState);
+              await setItem(STORAGE_KEY, finalState);
+            } catch {
+              // ignore
+            }
           }
+
+          // Auto-sync with server in preview so src/portfolioData.ts, public/saved_portfolio.json, and the ZIP are in perfect sync
+          if (isPreviewEnv) {
+            try {
+              fetch('/api/save-portfolio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(finalState),
+              }).catch(() => {});
+            } catch {
+              // ignore
+            }
+          }
+        } else {
+          localStorage.setItem(CODE_SIGNATURE_KEY, CODE_VIDEOS_SIGNATURE);
         }
       } catch (err) {
         console.error('Failed to load saved portfolio data', err);
@@ -337,8 +391,9 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLastSavedTime(now);
 
-    // 1. Save to IndexedDB (for large images and videos)
+    // 1. Save to IndexedDB under both v1 and current key so nothing is ever lost
     try {
+      await setItem(STORAGE_KEY_V1, nextState);
       await setItem(STORAGE_KEY, nextState);
     } catch (e) {
       console.error('Failed to save to IndexedDB', e);
@@ -346,8 +401,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // 2. Save backup to localStorage
     try {
-      localStorage.setItem(BACKUP_KEY, JSON.stringify(nextState));
-    } catch (e) {
+      const serialized = JSON.stringify(nextState);
+      localStorage.setItem(BACKUP_KEY_V1, serialized);
+      localStorage.setItem(BACKUP_KEY, serialized);
+    } catch {
       // ignore quota limits if image is large
     }
 
@@ -364,7 +421,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const saveAllNow = async (): Promise<boolean> => {
-    await persist(data);
+    await persist(latestDataRef.current);
     return true;
   };
 
@@ -391,7 +448,8 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
-    const next = { ...data, profilePic: newImageSrc };
+    const cur = latestDataRef.current;
+    const next = { ...cur, profilePic: newImageSrc };
     await persist(next);
   };
 
@@ -400,13 +458,14 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
+    const cur = latestDataRef.current;
     const cleaned = { ...videoUpdates };
     if (cleaned.youtubeId) {
       cleaned.youtubeId = extractYouTubeId(cleaned.youtubeId);
     }
     const next = {
-      ...data,
-      featuredVideo: { ...data.featuredVideo, ...cleaned },
+      ...cur,
+      featuredVideo: { ...cur.featuredVideo, ...cleaned },
     };
     await persist(next);
   };
@@ -416,14 +475,15 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
+    const cur = latestDataRef.current;
     const cleaned = { ...updates };
     if (cleaned.youtubeId) {
       cleaned.youtubeId = extractYouTubeId(cleaned.youtubeId);
     }
-    const nextVideos = data.portfolioVideos.map((v) =>
+    const nextVideos = cur.portfolioVideos.map((v) =>
       v.id === id ? { ...v, ...cleaned } : v
     );
-    const next = { ...data, portfolioVideos: nextVideos };
+    const next = { ...cur, portfolioVideos: nextVideos };
     await persist(next);
   };
 
@@ -432,6 +492,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       throw new Error('Unauthorized: Admin access required');
     }
+    const cur = latestDataRef.current;
     const newId = 'video-' + Date.now();
     const item: VideoItem = {
       id: newId,
@@ -440,11 +501,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       videoUrl: newVideo?.videoUrl || '',
       blobKey: newVideo?.blobKey || '',
       thumbnailUrl: newVideo?.thumbnailUrl || '',
-      title: newVideo?.title || `New Video Slide ${data.portfolioVideos.length + 1}`,
+      title: newVideo?.title || `New Video Slide ${cur.portfolioVideos.length + 1}`,
       category: newVideo?.category || 'Creative Video Edit',
       description: newVideo?.description || 'Custom video editing cut showcasing narrative pacing and sound design.',
     };
-    const next = { ...data, portfolioVideos: [...data.portfolioVideos, item] };
+    const next = { ...cur, portfolioVideos: [...cur.portfolioVideos, item] };
     await persist(next);
     return newId;
   };
@@ -454,10 +515,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
-    if (data.portfolioVideos.length <= 1) {
+    const cur = latestDataRef.current;
+    if (cur.portfolioVideos.length <= 1) {
       return;
     }
-    const next = { ...data, portfolioVideos: data.portfolioVideos.filter((v) => v.id !== id) };
+    const next = { ...cur, portfolioVideos: cur.portfolioVideos.filter((v) => v.id !== id) };
     await persist(next);
   };
 
@@ -466,15 +528,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
-    const index = data.portfolioVideos.findIndex((v) => v.id === id);
+    const cur = latestDataRef.current;
+    const index = cur.portfolioVideos.findIndex((v) => v.id === id);
     if (index === -1) return;
     const targetIndex = direction === 'prev' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= data.portfolioVideos.length) return;
+    if (targetIndex < 0 || targetIndex >= cur.portfolioVideos.length) return;
 
-    const nextItems = [...data.portfolioVideos];
+    const nextItems = [...cur.portfolioVideos];
     const [moved] = nextItems.splice(index, 1);
     nextItems.splice(targetIndex, 0, moved);
-    const next = { ...data, portfolioVideos: nextItems };
+    const next = { ...cur, portfolioVideos: nextItems };
     await persist(next);
   };
 
@@ -483,10 +546,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
-    const nextGraphics = data.graphicItems.map((g) =>
+    const cur = latestDataRef.current;
+    const nextGraphics = cur.graphicItems.map((g) =>
       g.id === id ? { ...g, ...updates } : g
     );
-    const next = { ...data, graphicItems: nextGraphics };
+    const next = { ...cur, graphicItems: nextGraphics };
     await persist(next);
   };
 
@@ -495,16 +559,17 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       throw new Error('Unauthorized: Admin access required');
     }
+    const cur = latestDataRef.current;
     const newId = 'graphic-' + Date.now();
     const item: GraphicItem = {
       id: newId,
       filename: newItem?.filename || '/graphics/1.jpg',
-      title: newItem?.title || `New Design ${data.graphicItems.length + 1}`,
+      title: newItem?.title || `New Design ${cur.graphicItems.length + 1}`,
       subtitle: newItem?.subtitle || 'Custom Visual Art',
       category: newItem?.category || 'Poster Design',
       fitMode: newItem?.fitMode || 'cover',
     };
-    const next = { ...data, graphicItems: [...data.graphicItems, item] };
+    const next = { ...cur, graphicItems: [...cur.graphicItems, item] };
     await persist(next);
     return newId;
   };
@@ -514,11 +579,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
-    if (data.graphicItems.length <= 1) {
+    const cur = latestDataRef.current;
+    if (cur.graphicItems.length <= 1) {
       alert('কমপক্ষে একটি ডিজাইন স্লাইড থাকতে হবে।');
       return;
     }
-    const next = { ...data, graphicItems: data.graphicItems.filter((g) => g.id !== id) };
+    const next = { ...cur, graphicItems: cur.graphicItems.filter((g) => g.id !== id) };
     await persist(next);
   };
 
@@ -527,15 +593,16 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
-    const index = data.graphicItems.findIndex((g) => g.id === id);
+    const cur = latestDataRef.current;
+    const index = cur.graphicItems.findIndex((g) => g.id === id);
     if (index === -1) return;
     const targetIndex = direction === 'prev' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= data.graphicItems.length) return;
+    if (targetIndex < 0 || targetIndex >= cur.graphicItems.length) return;
 
-    const nextItems = [...data.graphicItems];
+    const nextItems = [...cur.graphicItems];
     const [moved] = nextItems.splice(index, 1);
     nextItems.splice(targetIndex, 0, moved);
-    const next = { ...data, graphicItems: nextItems };
+    const next = { ...cur, graphicItems: nextItems };
     await persist(next);
   };
 
@@ -544,9 +611,10 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setShowAdminLoginModal(true);
       return;
     }
+    const cur = latestDataRef.current;
     const next = {
-      ...data,
-      personalInfo: { ...data.personalInfo, ...updates },
+      ...cur,
+      personalInfo: { ...cur.personalInfo, ...updates },
     };
     await persist(next);
   };

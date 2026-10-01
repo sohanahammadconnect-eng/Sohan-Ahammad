@@ -106,13 +106,8 @@ export async function clearAll(): Promise<void> {
 export function extractYouTubeId(input: string): string {
   if (!input) return '';
   const trimmed = input.trim();
-  
-  // Direct 11 char ID
-  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
-    return trimmed;
-  }
-  
-  // youtu.be/ID
+
+  // youtu.be/ID (check URL patterns FIRST in case user pasted URL next to existing text)
   const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
   if (shortMatch) return shortMatch[1];
 
@@ -127,6 +122,15 @@ export function extractYouTubeId(input: string): string {
   // youtube.com/embed/ID
   const embedMatch = trimmed.match(/embed\/([a-zA-Z0-9_-]{11})/);
   if (embedMatch) return embedMatch[1];
+
+  // youtube.com/live/ID
+  const liveMatch = trimmed.match(/live\/([a-zA-Z0-9_-]{11})/);
+  if (liveMatch) return liveMatch[1];
+
+  // Direct 11 char ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return trimmed;
+  }
 
   return trimmed;
 }

@@ -2,10 +2,49 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
-import { execSync } from 'child_process';
-import {defineConfig, Plugin} from 'vite';
+import { execSync, exec } from 'child_process';
+import { defineConfig, Plugin } from 'vite';
 
 const savedPortfolioPath = path.resolve(__dirname, 'public/saved_portfolio.json');
+const tsDataPath = path.resolve(__dirname, 'src/portfolioData.ts');
+
+let zipRebuildTimer: NodeJS.Timeout | null = null;
+let isBuildingZip = false;
+
+function writePortfolioTsSync(data: any) {
+  const personalInfo = data.personalInfo || {};
+  const featuredVideo = data.featuredVideo || {};
+  const portfolioVideos = data.portfolioVideos || [];
+  const graphicItems = data.graphicItems || [];
+
+  const tsContent = `import { VideoItem, GraphicItem } from './types';
+
+export const PERSONAL_INFO = ${JSON.stringify(personalInfo, null, 2)};
+
+export const FEATURED_VIDEO: VideoItem = ${JSON.stringify(featuredVideo, null, 2)};
+
+export const PORTFOLIO_VIDEOS: VideoItem[] = ${JSON.stringify(portfolioVideos, null, 2)};
+
+export const GRAPHIC_ITEMS: GraphicItem[] = ${JSON.stringify(graphicItems, null, 2)};
+`;
+  fs.writeFileSync(tsDataPath, tsContent, 'utf-8');
+}
+
+function scheduleZipRebuild() {
+  if (zipRebuildTimer) {
+    clearTimeout(zipRebuildTimer);
+  }
+  zipRebuildTimer = setTimeout(() => {
+    if (isBuildingZip) return;
+    isBuildingZip = true;
+    exec('python3 scripts/update_portfolio_and_zip.py', { cwd: __dirname }, (err) => {
+      if (err) {
+        console.error('Background ZIP rebuild error:', err);
+      }
+      isBuildingZip = false;
+    });
+  }, 500);
+}
 
 function portfolioApiPlugin(): Plugin {
   return {
@@ -52,6 +91,7 @@ function portfolioApiPlugin(): Plugin {
             try {
               const data = JSON.parse(body);
               fs.writeFileSync(savedPortfolioPath, JSON.stringify(data, null, 2), 'utf-8');
+              writePortfolioTsSync(data);
 
               // Synchronously update public/profile.jpg so Telegram & WhatsApp crawlers get the latest photo
               if (data.profilePic && typeof data.profilePic === 'string' && data.profilePic.includes('base64,')) {
@@ -69,15 +109,11 @@ function portfolioApiPlugin(): Plugin {
                 }
               }
 
-              // Automatically regenerate src/portfolioData.ts and re-package public/sohan-portfolio-latest.zip
-              try {
-                execSync('python3 scripts/update_portfolio_and_zip.py', { cwd: __dirname });
-              } catch (e) {
-                console.error('Failed to run update_portfolio_and_zip.py', e);
-              }
+              // Schedule non-blocking ZIP rebuild so rapid video link edits never block or drop
+              scheduleZipRebuild();
 
               res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: true, message: 'Data saved and ZIP updated successfully' }));
+              res.end(JSON.stringify({ success: true, message: 'Data saved and synced immediately' }));
             } catch (err) {
               res.writeHead(500, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: false, error: String(err) }));
@@ -99,6 +135,11 @@ function portfolioApiPlugin(): Plugin {
         }
 
         if (req.url?.startsWith('/api/download-zip')) {
+          try {
+            execSync('python3 scripts/update_portfolio_and_zip.py', { cwd: __dirname });
+          } catch (e) {
+            console.error('Failed to rebuild zip before download:', e);
+          }
           const zipPath = path.resolve(__dirname, 'public/sohan-portfolio-latest.zip');
           if (fs.existsSync(zipPath)) {
             const stat = fs.statSync(zipPath);
@@ -147,7 +188,7 @@ export default defineConfig(() => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

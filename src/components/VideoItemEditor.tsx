@@ -47,11 +47,19 @@ export const VideoItemEditor: React.FC<VideoItemEditorProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [ytInput, setYtInput] = useState<string>(video.youtubeId ? `https://www.youtube.com/watch?v=${video.youtubeId}` : '');
+  const [linkSavedBadge, setLinkSavedBadge] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const thumbInputRef = useRef<HTMLInputElement>(null);
 
   const sourceType = video.videoSourceType || (video.videoUrl ? 'local' : 'youtube');
+
+  useEffect(() => {
+    if (video.youtubeId && extractYouTubeId(ytInput) !== video.youtubeId) {
+      setYtInput(`https://www.youtube.com/watch?v=${video.youtubeId}`);
+    }
+  }, [video.youtubeId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -347,27 +355,68 @@ export const VideoItemEditor: React.FC<VideoItemEditorProps> = ({
       {sourceType === 'youtube' && (
         <div className="space-y-3">
           <div>
-            <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-              YouTube Video URL or 11-Character ID
-            </label>
-            <input
-              type="text"
-              value={video.youtubeId || ''}
-              onChange={(e) => {
-                const id = extractYouTubeId(e.target.value);
-                onUpdate({ youtubeId: id, videoSourceType: 'youtube' });
-              }}
-              placeholder="https://www.youtube.com/watch?v=... বা youtu.be/..."
-              className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white font-mono focus:outline-none focus:border-red-500"
-            />
-            <p className="text-[10px] text-slate-500 mt-1">
-              ইউটিউবের সাধারণ লিংক, Shorts লিংক বা কেবল ১১ অক্ষরের ভিডিও আইডি দিলেই চলবে।
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-semibold text-slate-300">
+                YouTube Video URL or 11-Character ID (ইউটিউব ভিডিও লিংক)
+              </label>
+              {linkSavedBadge && (
+                <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> লিংক আপডেট হয়েছে!
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={ytInput}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setYtInput(val);
+                  const id = extractYouTubeId(val);
+                  if (id && /^[a-zA-Z0-9_-]{11}$/.test(id)) {
+                    onUpdate({ youtubeId: id, videoSourceType: 'youtube', thumbnailUrl: '' });
+                    setLinkSavedBadge(true);
+                    setTimeout(() => setLinkSavedBadge(false), 2000);
+                  }
+                }}
+                placeholder="https://www.youtube.com/watch?v=... বা youtu.be/..."
+                className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+              />
+              {ytInput && (
+                <button
+                  type="button"
+                  onClick={() => setYtInput('')}
+                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
+                  title="পুরাতন লিংক মুছে নতুন লিংক পেস্ট করুন"
+                >
+                  মুছুন
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const id = extractYouTubeId(ytInput);
+                  if (id) {
+                    onUpdate({ youtubeId: id, videoSourceType: 'youtube', thumbnailUrl: '' });
+                    setLinkSavedBadge(true);
+                    setTimeout(() => setLinkSavedBadge(false), 2000);
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold cursor-pointer shadow"
+              >
+                লিংক সেট করুন
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              বক্সে ক্লিক করে নতুন ইউটিউব লিংক পেস্ট করলেই ভিডিও সাথে সাথে পরিবর্তন ও সেভ হয়ে যাবে (বর্তমান আইডি: <span className="text-amber-400 font-mono">{video.youtubeId}</span>)।
             </p>
           </div>
 
           {video.youtubeId && (
             <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border border-slate-800 shadow">
               <iframe
+                key={video.youtubeId}
                 src={`https://www.youtube-nocookie.com/embed/${video.youtubeId}?rel=0`}
                 title="Preview"
                 className="w-full h-full border-0"
