@@ -61,17 +61,19 @@ export const PORTFOLIO_VIDEOS: VideoItem[] = [
   },
   {
     "id": "video-2",
-    "youtubeId": "1PXpU9ZMspQ",
+    "youtubeId": "Daog94THm1c",
     "title": "High-Energy Music & Motion Edit",
     "category": "Music & Performance",
-    "description": "Tight sync cutting with audio beats, speed ramping, and modern stylistic flair."
+    "description": "Tight sync cutting with audio beats, speed ramping, and modern stylistic flair.",
+    "videoSourceType": "youtube"
   },
   {
     "id": "video-3",
-    "youtubeId": "d1lwd6GmW-g",
+    "youtubeId": "1PXpU9ZMspQ",
     "title": "Storytelling & Documentary Cut",
     "category": "Documentary / Story",
-    "description": "Emotionally resonant storytelling with ambient sound design and thoughtful pacing."
+    "description": "Emotionally resonant storytelling with ambient sound design and thoughtful pacing.",
+    "videoSourceType": "youtube"
   },
   {
     "id": "video-4",
@@ -111,6 +113,17 @@ export const PORTFOLIO_VIDEOS: VideoItem[] = [
     "category": "Interview / Docu",
     "description": "Clean dialogue leveling, multi-camera angle cutting, and narrative B-roll weaving.",
     "videoSourceType": "youtube"
+  },
+  {
+    "id": "video-1790830074893",
+    "youtubeId": "d1lwd6GmW-g",
+    "videoSourceType": "youtube",
+    "videoUrl": "",
+    "blobKey": "",
+    "thumbnailUrl": "",
+    "title": "New Video Slide 9",
+    "category": "Creative Video Edit",
+    "description": "Custom video editing cut showcasing narrative pacing and sound design."
   }
 ];
 

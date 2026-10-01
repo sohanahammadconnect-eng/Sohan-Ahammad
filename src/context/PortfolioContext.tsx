@@ -367,8 +367,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return true;
   };
 
+  // Direct on-page video editing is locked and hidden for public visitors
+  const ENABLE_DIRECT_VIDEO_EDIT = false;
+
   const openEditModal = (section: 'all' | 'profile' | 'featured' | 'videos' | 'graphics' | 'bio' = 'all', itemId?: string) => {
-    if (!isAdmin) {
+    if (!isAdmin && !(ENABLE_DIRECT_VIDEO_EDIT && (section === 'featured' || section === 'videos'))) {
       setPendingEditAction({ section, itemId });
       setShowAdminLoginModal(true);
       return;
@@ -392,7 +395,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updateFeaturedVideo = async (videoUpdates: Partial<VideoItem>) => {
-    if (!isAdmin) {
+    if (!isAdmin && !ENABLE_DIRECT_VIDEO_EDIT) {
       setShowAdminLoginModal(true);
       return;
     }
@@ -408,7 +411,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updatePortfolioVideo = async (id: string, updates: Partial<VideoItem>) => {
-    if (!isAdmin) {
+    if (!isAdmin && !ENABLE_DIRECT_VIDEO_EDIT) {
       setShowAdminLoginModal(true);
       return;
     }
@@ -424,7 +427,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const addPortfolioVideo = async (newVideo?: Partial<VideoItem>): Promise<string> => {
-    if (!isAdmin) {
+    if (!isAdmin && !ENABLE_DIRECT_VIDEO_EDIT) {
       setShowAdminLoginModal(true);
       throw new Error('Unauthorized: Admin access required');
     }
@@ -446,12 +449,11 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const deletePortfolioVideo = async (id: string) => {
-    if (!isAdmin) {
+    if (!isAdmin && !ENABLE_DIRECT_VIDEO_EDIT) {
       setShowAdminLoginModal(true);
       return;
     }
     if (data.portfolioVideos.length <= 1) {
-      alert('কমপক্ষে একটি ভিডিও স্লাইড থাকতে হবে।');
       return;
     }
     const next = { ...data, portfolioVideos: data.portfolioVideos.filter((v) => v.id !== id) };
@@ -459,7 +461,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const reorderPortfolioVideo = async (id: string, direction: 'prev' | 'next') => {
-    if (!isAdmin) {
+    if (!isAdmin && !ENABLE_DIRECT_VIDEO_EDIT) {
       setShowAdminLoginModal(true);
       return;
     }
@@ -537,7 +539,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updatePersonalInfo = async (updates: Partial<PersonalInfo>) => {
-    if (!isAdmin) {
+    if (!isAdmin && !(ENABLE_DIRECT_VIDEO_EDIT && 'youtubeChannelUrl' in updates)) {
       setShowAdminLoginModal(true);
       return;
     }
