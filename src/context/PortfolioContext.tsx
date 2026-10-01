@@ -45,7 +45,8 @@ interface PortfolioContextType {
   generateCustomHtml: () => string;
 }
 
-const STORAGE_KEY = 'sohan_portfolio_data_v1';
+const STORAGE_KEY = 'sohan_portfolio_data_v5_20260930';
+const BACKUP_KEY = 'sohan_portfolio_backup_v5_20260930';
 
 const defaultState: PortfolioDataState = {
   profilePic: '/profile.jpg',
@@ -253,7 +254,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         // Fallback to localStorage backup if IndexedDB is empty
         if (!saved) {
           try {
-            const ls = localStorage.getItem('sohan_portfolio_backup');
+            const ls = localStorage.getItem(BACKUP_KEY);
             if (ls) saved = JSON.parse(ls);
           } catch {
             // ignore
@@ -345,7 +346,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // 2. Save backup to localStorage
     try {
-      localStorage.setItem('sohan_portfolio_backup', JSON.stringify(nextState));
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(nextState));
     } catch (e) {
       // ignore quota limits if image is large
     }
